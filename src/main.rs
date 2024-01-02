@@ -17,8 +17,17 @@ struct ExecutionContext {
 }
 
 fn main() {
-    let context = ExecutionContext::parse();
-    let program = fs::read_to_string(context.source_file).expect("failed to read the source file");
+    // let context = ExecutionContext::parse();
+    // let program = fs::read_to_string(context.source_file).expect("failed to read the source file");
+
+    let program = r#"
+    while true do skip; skip done;
+    x := 1;
+    x := 2;
+    x := 3;
+    x := 4
+    "#;
+
     let parser = whilep::SExprParser::new();
     let ast = parser.parse(&program).expect("failed to parse the program");
 

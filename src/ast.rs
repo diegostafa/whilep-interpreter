@@ -1,7 +1,6 @@
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum StatementExpr {
     Skip,
-
     Chain(Box<StatementExpr>, Box<StatementExpr>),
 
     Assignment {
@@ -29,17 +28,14 @@ pub enum ArithmeticExpr {
     Sub(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Mul(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Div(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
-    Parenthesis(Box<ArithmeticExpr>),
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum BooleanExpr {
     True,
     False,
-
     Not(Box<BooleanExpr>),
     And(Box<BooleanExpr>, Box<BooleanExpr>),
     NumEq(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     NumLtEq(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
-    Parenthesis(Box<BooleanExpr>),
 }
