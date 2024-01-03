@@ -1,35 +1,50 @@
 use crate::ast::*;
+use crate::eval;
 use crate::state::*;
 
-pub fn statement_expr(sexpr: &StatementExpr, state: &mut State) {
-    match sexpr {
-        StatementExpr::Skip => {}
+type StateFunction = Box<dyn Fn(State) -> State>;
+
+fn id() -> StateFunction {
+    Box::new(|state| state)
+}
+
+fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
+    Box::new(move |state| g(f(state)))
+}
+
+fn FIX(F: fn(StateFunction) -> StateFunction) -> StateFunction {
+    Box::new(|state| todo!())
+}
+
+pub fn make_denotational(ast: StatementExpr) -> StateFunction {
+    match ast {
+        StatementExpr::Skip => id(),
 
         StatementExpr::Chain(s1, s2) => {
-            statement_expr(s1, state);
-            statement_expr(s2, state);
+            let f = make_denotational(*s1);
+            let g = make_denotational(*s2);
+            compose(f, g)
         }
 
-        StatementExpr::Assignment { var, val } => {
-            state.insert(var.to_string(), arithmetic_expr(val, state));
+        StatementExpr::Assignment { var, val } => Box::new(move |state| {
+            let val = eval::arithmetic_expr(&val, &state);
+            let mut new_state = state.clone();
+            new_state.insert(var.to_string(), val);
+            new_state
+        }),
+
+        StatementExpr::If { cond, s1, s2 } => {
+            let d1 = make_denotational(*s1);
+            let d2 = make_denotational(*s2);
+
+            Box::new(move |state| match eval::boolean_expr(&cond, &state) {
+                true => d1(state),
+                false => d2(state),
+            })
         }
 
-        StatementExpr::Conditional {
-            cond,
-            tt_branch,
-            ff_branch,
-        } => {
-            if boolean_expr(cond, state) {
-                statement_expr(tt_branch, state)
-            } else {
-                statement_expr(ff_branch, state)
-            }
-        }
-
-        StatementExpr::WhileLoop { cond, body } => {
-            while boolean_expr(cond, state) {
-                statement_expr(body, state);
-            }
+        StatementExpr::While { cond, body } => {
+            todo!()
         }
     }
 }

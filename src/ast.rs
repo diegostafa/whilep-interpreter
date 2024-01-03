@@ -16,13 +16,13 @@ pub enum StatementExpr {
         val: Box<ArithmeticExpr>,
     },
 
-    Conditional {
+    If {
         cond: Box<BooleanExpr>,
-        tt_branch: Box<StatementExpr>,
-        ff_branch: Box<StatementExpr>,
+        s1: Box<StatementExpr>,
+        s2: Box<StatementExpr>,
     },
 
-    WhileLoop {
+    While {
         cond: Box<BooleanExpr>,
         body: Box<StatementExpr>,
     },

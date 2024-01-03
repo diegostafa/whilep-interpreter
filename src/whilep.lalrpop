@@ -17,14 +17,14 @@ TerminalSExpr: StatementExpr =
 {
     "skip" => StatementExpr::Skip,
     <x:Identifier> ":=" <e:AExpr> => StatementExpr::Assignment{var: x, val: Box::new(e)},
-    "if" <b:BExpr> "then" <s1:SExpr> "else" <s2:SExpr> "end"  => StatementExpr::Conditional{cond:Box::new(b), tt_branch: Box::new(s1), ff_branch: Box::new(s2)},
-    "while" <b:BExpr> "do" <s:SExpr> "done" => StatementExpr::WhileLoop{cond: Box::new(b), body: Box::new(s)},
+    "if" <b:BExpr> "then" <s1:SExpr> "else" <s2:SExpr> "end"  => StatementExpr::If{cond:Box::new(b), s1: Box::new(s1), s2: Box::new(s2)},
+    "while" <b:BExpr> "do" <s:SExpr> "done" => StatementExpr::While{cond: Box::new(b), body: Box::new(s)},
 
     // syntax sugar
     "repeat" <s:SExpr> "until" <b:BExpr>
         => StatementExpr::Chain(
             Box::new(s.clone()),
-            Box::new(StatementExpr::WhileLoop{
+            Box::new(StatementExpr::While{
                 cond: Box::new(BooleanExpr::Not(Box::new(b))),
                 body: Box::new(s.clone())})),
 
@@ -32,7 +32,7 @@ TerminalSExpr: StatementExpr =
     "for" <x:Identifier> "in"  "[" <from:AExpr> ".."  <to:AExpr> "]" "do" <s:SExpr> "done"
         => StatementExpr::Chain(
             Box::new(StatementExpr::Assignment{var: x.clone(), val: Box::new(from)}),
-            Box::new(StatementExpr::WhileLoop{
+            Box::new(StatementExpr::While{
                 cond: Box::new(BooleanExpr::NumLtEq(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(to))),
                 body: Box::new(StatementExpr::Chain(
                     Box::new(s),
