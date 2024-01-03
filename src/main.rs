@@ -1,35 +1,23 @@
-use clap::Parser;
-use lalrpop_util::lalrpop_mod;
 use std::fs;
 
 mod ast;
-
-lalrpop_mod!(pub whilep);
-
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct ExecutionContext {
-    #[arg(short = 'S', long, required = true)]
-    source_file: String,
-
-    #[arg(short = 's', long, default_value = "")]
-    state_file: String,
-}
+mod cli;
+mod eval;
+mod state;
 
 fn main() {
-    // let context = ExecutionContext::parse();
-    // let program = fs::read_to_string(context.source_file).expect("failed to read the source file");
+    let options = cli::parse_options();
 
-    let program = r#"
-    while true do skip; skip done;
-    x := 1;
-    x := 2;
-    x := 3;
-    x := 4
-    "#;
+    let mut state = match options.state_file {
+        Some(file) => state::create_from_file(&file),
+        None => state::create_empty(),
+    };
 
-    let parser = whilep::SExprParser::new();
-    let ast = parser.parse(&program).expect("failed to parse the program");
+    let source = fs::read_to_string(&options.program_file).expect("couldn't read the program file");
+    let ast = ast::parse(&source).expect("failed to parse the program");
+
+    eval::statement_expr(&ast, &mut state);
 
     println!("{:#?}", ast);
+    println!("{:#?}", state);
 }

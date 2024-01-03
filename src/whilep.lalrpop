@@ -13,7 +13,7 @@ pub SExpr: StatementExpr =
     <s1:SExpr> ";" <s2:TerminalSExpr> => StatementExpr::Chain(Box::new(s1), Box::new(s2)),
 };
 
-pub TerminalSExpr: StatementExpr =
+TerminalSExpr: StatementExpr =
 {
     "skip" => StatementExpr::Skip,
     <x:Identifier> ":=" <e:AExpr> => StatementExpr::Assignment{var: x, val: Box::new(e)},
@@ -42,7 +42,7 @@ pub TerminalSExpr: StatementExpr =
                             )})))})),
 };
 
-pub AExpr: ArithmeticExpr =
+AExpr: ArithmeticExpr =
 {
     #[precedence(level="1")]
     <x:Identifier>  => ArithmeticExpr::Identifier(x),
@@ -57,7 +57,7 @@ pub AExpr: ArithmeticExpr =
     <l:AExpr> "-" <r:AExpr> => ArithmeticExpr::Sub(Box::new(l), Box::new(r)),
 };
 
-pub BExpr: BooleanExpr =
+BExpr: BooleanExpr =
 {
     #[precedence(level="1")]
     "true"                      => BooleanExpr::True,

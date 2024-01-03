@@ -1,1 +1,17 @@
-for x in [30..200] do skip
+x := 0;
+
+for i in [1..10] do
+  x := x + i
+done;
+
+for i in [1..10] do
+  x := x + i
+done;
+
+for i in [1..10] do
+  x := x + i
+done;
+
+for i in [1..10] do
+  x := x + i
+done

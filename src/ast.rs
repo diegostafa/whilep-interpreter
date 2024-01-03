@@ -1,3 +1,11 @@
+use lalrpop_util::{lalrpop_mod, lexer::Token, ParseError};
+lalrpop_mod!(pub whilep);
+
+pub fn parse(source: &str) -> Result<StatementExpr, ParseError<usize, Token, &'static str>> {
+    let parser = whilep::SExprParser::new();
+    return parser.parse(source);
+}
+
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum StatementExpr {
     Skip,
