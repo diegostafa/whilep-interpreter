@@ -64,7 +64,7 @@ pub fn induced_function(ast: StatementExpr) -> StateFunction {
 pub fn arithmetic_expr(expr: &ArithmeticExpr, state: &State) -> i32 {
     match expr {
         ArithmeticExpr::Number(n) => *n,
-        ArithmeticExpr::Identifier(var) => state.get(var).unwrap().to_owned(),
+        ArithmeticExpr::Identifier(var) => *state.get(var).unwrap(),
         ArithmeticExpr::Add(a1, a2) => arithmetic_expr(a1, state) + arithmetic_expr(a2, state),
         ArithmeticExpr::Sub(a1, a2) => arithmetic_expr(a1, state) - arithmetic_expr(a2, state),
         ArithmeticExpr::Mul(a1, a2) => arithmetic_expr(a1, state) * arithmetic_expr(a2, state),
