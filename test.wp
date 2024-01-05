@@ -1,17 +1,1 @@
-x := 0;
-
-for i in [1..10] do
-  x := x + i
-done;
-
-for i in [1..10] do
-  x := x + i
-done;
-
-for i in [1..10] do
-  x := x + i
-done;
-
-for i in [1..10] do
-  x := x + i
-done
+if 3 < 100 then x := 10 else y := 20 end

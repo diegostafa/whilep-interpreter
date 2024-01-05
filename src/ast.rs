@@ -6,7 +6,7 @@ pub fn parse(source: &str) -> Result<StatementExpr, ParseError<usize, Token, &'s
     return parser.parse(source);
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum StatementExpr {
     Skip,
     Chain(Box<StatementExpr>, Box<StatementExpr>),
@@ -28,7 +28,7 @@ pub enum StatementExpr {
     },
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum ArithmeticExpr {
     Identifier(String),
     Number(i32),
@@ -38,7 +38,7 @@ pub enum ArithmeticExpr {
     Div(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum BooleanExpr {
     True,
     False,

@@ -2,50 +2,62 @@ use crate::ast::*;
 use crate::eval;
 use crate::state::*;
 
-type StateFunction = Box<dyn Fn(State) -> State>;
+type StatePredicate = Box<dyn Fn(State) -> bool>;
+type StateFunction = Box<dyn Fn(State) -> Option<State>>;
+
+// semantic functions
+
+fn predicate(cond: BooleanExpr) -> StatePredicate {
+    Box::new(move |state| eval::boolean_expr(&cond, &state))
+}
 
 fn id() -> StateFunction {
-    Box::new(|state| state)
+    Box::new(|state| Some(state))
 }
 
 fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
-    Box::new(move |state| g(f(state)))
+    Box::new(move |state| match f(state.clone()) {
+        Some(new_state) => g(new_state),
+        None => None,
+    })
 }
 
-fn FIX(F: fn(StateFunction) -> StateFunction) -> StateFunction {
-    Box::new(|state| todo!())
+fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
+    Box::new(move |state| {
+        let mut new_state = state.clone();
+        new_state.insert(var.clone(), eval::arithmetic_expr(&val, &state));
+        Some(new_state)
+    })
 }
 
-pub fn make_denotational(ast: StatementExpr) -> StateFunction {
+fn conditional(p: StatePredicate, tt: StateFunction, ff: StateFunction) -> StateFunction {
+    Box::new(move |state| match p(state.clone()) {
+        true => tt(state),
+        false => ff(state),
+    })
+}
+
+fn fix(functional: fn(StateFunction) -> StateFunction) -> StateFunction {
+    todo!()
+}
+
+// evaluators
+
+pub fn induced_function(ast: StatementExpr) -> StateFunction {
     match ast {
         StatementExpr::Skip => id(),
 
-        StatementExpr::Chain(s1, s2) => {
-            let f = make_denotational(*s1);
-            let g = make_denotational(*s2);
-            compose(f, g)
-        }
+        StatementExpr::Chain(s1, s2) => compose(induced_function(*s1), induced_function(*s2)),
 
-        StatementExpr::Assignment { var, val } => Box::new(move |state| {
-            let val = eval::arithmetic_expr(&val, &state);
-            let mut new_state = state.clone();
-            new_state.insert(var.to_string(), val);
-            new_state
-        }),
+        StatementExpr::Assignment { var, val } => state_update((*var).to_string(), *val),
 
-        StatementExpr::If { cond, s1, s2 } => {
-            let d1 = make_denotational(*s1);
-            let d2 = make_denotational(*s2);
+        StatementExpr::If { cond, s1, s2 } => conditional(
+            predicate(*cond),
+            induced_function(*s1),
+            induced_function(*s2),
+        ),
 
-            Box::new(move |state| match eval::boolean_expr(&cond, &state) {
-                true => d1(state),
-                false => d2(state),
-            })
-        }
-
-        StatementExpr::While { cond, body } => {
-            todo!()
-        }
+        StatementExpr::While { cond, body } => id(),
     }
 }
 
