@@ -42,10 +42,10 @@ fn conditional(p: StatePredicate, tt: StateFunction, ff: StateFunction) -> State
     })
 }
 
-fn self_apply(f: &Functional, n: i32, inp: StateFunction) -> StateFunction {
+fn rec_self_apply(f: &Functional, n: i32, inp: StateFunction) -> StateFunction {
     match n {
         0 => inp,
-        _ => self_apply(f, n - 1, f(inp)),
+        _ => rec_self_apply(f, n - 1, f(inp)),
     }
 }
 
@@ -53,7 +53,7 @@ fn fix(f: Functional) -> StateFunction {
     Box::new(move |state| {
         let mut n = 0;
         loop {
-            let new_state = self_apply(&f, n, bottom())(state.clone());
+            let new_state = rec_self_apply(&f, n, bottom())(state.clone());
             if new_state.is_some() {
                 return new_state;
             }
