@@ -1,4 +1,4 @@
-x := 10;
+x := 0;
 while x < 202 do
-    x := x + 2
+    x := x + 50
 done

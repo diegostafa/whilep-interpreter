@@ -6,7 +6,7 @@ type StatePredicate = Box<dyn Fn(State) -> bool>;
 type StateFunction = Box<dyn Fn(State) -> Option<State>>;
 type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
 
-// semantic functions
+// --- semantic functions
 
 fn bottom() -> StateFunction {
     Box::new(|_| None)
@@ -30,6 +30,7 @@ fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
         Some(new_state)
     })
 }
+
 fn predicate(cond: BooleanExpr) -> StatePredicate {
     Box::new(move |state| eval::boolean_expr(&cond, &state))
 }
@@ -41,13 +42,10 @@ fn conditional(p: StatePredicate, tt: StateFunction, ff: StateFunction) -> State
     })
 }
 
-fn functional_power<F>(f: &F, n: i32, inp: StateFunction) -> StateFunction
-where
-    F: Fn(StateFunction) -> StateFunction,
-{
+fn self_apply(f: &Functional, n: i32, inp: StateFunction) -> StateFunction {
     match n {
         0 => inp,
-        _ => functional_power(f, n - 1, f(inp)),
+        _ => self_apply(f, n - 1, f(inp)),
     }
 }
 
@@ -55,18 +53,16 @@ fn fix(f: Functional) -> StateFunction {
     Box::new(move |state| {
         let mut n = 0;
         loop {
-            let lub = functional_power(&f, n, bottom());
-
-            if lub(state.clone()).is_some() {
-                break lub(state);
+            let new_state = self_apply(&f, n, bottom())(state.clone());
+            if new_state.is_some() {
+                return new_state;
             }
-
             n += 1;
         }
     })
 }
 
-// evaluators
+// --- evaluators
 
 pub fn induced_function(ast: StatementExpr) -> StateFunction {
     match ast {

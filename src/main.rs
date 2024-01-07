@@ -15,10 +15,7 @@ fn main() {
 
     let source = fs::read_to_string(&options.program_file).expect("couldn't read the program file");
     let ast = ast::parse(&source).expect("failed to parse the program");
+    let final_state = eval::induced_function(ast)(init_state);
 
-    let program = eval::induced_function(ast.clone());
-    let final_state = program(init_state);
-
-    // println!("{:#?}", ast);
     println!("{:#?}", final_state);
 }
