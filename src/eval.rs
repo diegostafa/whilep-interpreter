@@ -4,11 +4,12 @@ use crate::state::*;
 
 type StatePredicate = Box<dyn Fn(State) -> bool>;
 type StateFunction = Box<dyn Fn(State) -> Option<State>>;
+type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
 
 // semantic functions
 
-fn predicate(cond: BooleanExpr) -> StatePredicate {
-    Box::new(move |state| eval::boolean_expr(&cond, &state))
+fn bottom() -> StateFunction {
+    Box::new(|_| None)
 }
 
 fn id() -> StateFunction {
@@ -29,6 +30,9 @@ fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
         Some(new_state)
     })
 }
+fn predicate(cond: BooleanExpr) -> StatePredicate {
+    Box::new(move |state| eval::boolean_expr(&cond, &state))
+}
 
 fn conditional(p: StatePredicate, tt: StateFunction, ff: StateFunction) -> StateFunction {
     Box::new(move |state| match p(state.clone()) {
@@ -37,8 +41,29 @@ fn conditional(p: StatePredicate, tt: StateFunction, ff: StateFunction) -> State
     })
 }
 
-fn fix(functional: fn(StateFunction) -> StateFunction) -> StateFunction {
-    todo!()
+fn functional_power<F>(f: &F, n: i32, inp: StateFunction) -> StateFunction
+where
+    F: Fn(StateFunction) -> StateFunction,
+{
+    match n {
+        0 => inp,
+        _ => functional_power(f, n - 1, f(inp)),
+    }
+}
+
+fn fix(f: Functional) -> StateFunction {
+    Box::new(move |state| {
+        let mut n = 0;
+        loop {
+            let lub = functional_power(&f, n, bottom());
+
+            if lub(state.clone()).is_some() {
+                break lub(state);
+            }
+
+            n += 1;
+        }
+    })
 }
 
 // evaluators
@@ -46,18 +71,23 @@ fn fix(functional: fn(StateFunction) -> StateFunction) -> StateFunction {
 pub fn induced_function(ast: StatementExpr) -> StateFunction {
     match ast {
         StatementExpr::Skip => id(),
-
         StatementExpr::Chain(s1, s2) => compose(induced_function(*s1), induced_function(*s2)),
-
-        StatementExpr::Assignment { var, val } => state_update((*var).to_string(), *val),
-
+        StatementExpr::Assignment { var, val } => state_update(var, *val),
         StatementExpr::If { cond, s1, s2 } => conditional(
             predicate(*cond),
             induced_function(*s1),
             induced_function(*s2),
         ),
-
-        StatementExpr::While { cond, body } => id(),
+        StatementExpr::While { cond, body } => {
+            let induced_functional = Box::new(move |g| {
+                conditional(
+                    predicate(*cond.clone()),
+                    compose(induced_function(*body.clone()), g),
+                    id(),
+                )
+            });
+            fix(induced_functional)
+        }
     }
 }
 

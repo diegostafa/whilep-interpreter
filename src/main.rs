@@ -19,6 +19,6 @@ fn main() {
     let program = eval::induced_function(ast.clone());
     let final_state = program(init_state);
 
-    println!("{:#?}", ast);
+    // println!("{:#?}", ast);
     println!("{:#?}", final_state);
 }

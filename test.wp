@@ -1,1 +1,4 @@
-if 3 < 100 then x := 10 else y := 20 end
+x := 10;
+while x < 202 do
+    x := x + 2
+done
