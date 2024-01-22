@@ -2,6 +2,8 @@ use crate::ast::*;
 use crate::eval;
 use crate::state::*;
 
+// --- type aliases
+
 type StatePredicate = Box<dyn Fn(State) -> bool>;
 type StateFunction = Box<dyn Fn(State) -> Option<State>>;
 type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
@@ -42,10 +44,10 @@ fn conditional(p: StatePredicate, tt: StateFunction, ff: StateFunction) -> State
     })
 }
 
-fn rec_self_apply(f: &Functional, n: i32, inp: StateFunction) -> StateFunction {
+fn rec_self_apply(f: &Functional, n: i32, input: StateFunction) -> StateFunction {
     match n {
-        0 => inp,
-        _ => rec_self_apply(f, n - 1, f(inp)),
+        0 => input,
+        _ => rec_self_apply(f, n - 1, f(input)),
     }
 }
 

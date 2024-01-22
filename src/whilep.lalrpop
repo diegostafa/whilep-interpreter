@@ -16,11 +16,17 @@ pub SExpr: StatementExpr =
 TerminalSExpr: StatementExpr =
 {
     "skip" => StatementExpr::Skip,
+
     <x:Identifier> ":=" <e:AExpr> => StatementExpr::Assignment{var: x, val: Box::new(e)},
+    <x:Identifier> "++" => StatementExpr::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Add(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(ArithmeticExpr::Number(1))))},
+    <x:Identifier> "--" => StatementExpr::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(ArithmeticExpr::Number(1))))},
+    <x:Identifier> "+-" <e:AExpr> => StatementExpr::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Add(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
+    <x:Identifier> "-=" <e:AExpr> => StatementExpr::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
+
     "if" <b:BExpr> "then" <s1:SExpr> "else" <s2:SExpr> "end"  => StatementExpr::If{cond:Box::new(b), s1: Box::new(s1), s2: Box::new(s2)},
+
     "while" <b:BExpr> "do" <s:SExpr> "done" => StatementExpr::While{cond: Box::new(b), body: Box::new(s)},
 
-    // syntax sugar
     "repeat" <s:SExpr> "until" <b:BExpr>
         => StatementExpr::Chain(
             Box::new(s.clone()),
@@ -28,7 +34,6 @@ TerminalSExpr: StatementExpr =
                 cond: Box::new(BooleanExpr::Not(Box::new(b))),
                 body: Box::new(s.clone())})),
 
-    // syntax sugar
     "for" <x:Identifier> "in"  "[" <from:AExpr> ".."  <to:AExpr> "]" "do" <s:SExpr> "done"
         => StatementExpr::Chain(
             Box::new(StatementExpr::Assignment{var: x.clone(), val: Box::new(from)}),
@@ -38,8 +43,7 @@ TerminalSExpr: StatementExpr =
                     Box::new(s),
                     Box::new(StatementExpr::Assignment{
                         var: x.clone(),
-                        val: Box::new(ArithmeticExpr::Add(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(ArithmeticExpr::Number(1)))
-                            )})))})),
+                        val: Box::new(ArithmeticExpr::Add(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(ArithmeticExpr::Number(1))))})))})),
 };
 
 AExpr: ArithmeticExpr =
@@ -49,12 +53,12 @@ AExpr: ArithmeticExpr =
     <n:Number>      => ArithmeticExpr::Number(n),
 
     #[precedence(level="2")] #[assoc(side="left")]
-    <l:AExpr> "*" <r:AExpr> => ArithmeticExpr::Mul(Box::new(l), Box::new(r)),
-    <l:AExpr> "/" <r:AExpr> => ArithmeticExpr::Div(Box::new(l), Box::new(r)),
+    "(" <l:AExpr> "*" <r:AExpr> ")" => ArithmeticExpr::Mul(Box::new(l), Box::new(r)),
+    "(" <l:AExpr> "/" <r:AExpr> ")" => ArithmeticExpr::Div(Box::new(l), Box::new(r)),
 
     #[precedence(level="3")] #[assoc(side="left")]
-    <l:AExpr> "+" <r:AExpr> => ArithmeticExpr::Add(Box::new(l), Box::new(r)),
-    <l:AExpr> "-" <r:AExpr> => ArithmeticExpr::Sub(Box::new(l), Box::new(r)),
+    "(" <l:AExpr> "+" <r:AExpr> ")" => ArithmeticExpr::Add(Box::new(l), Box::new(r)),
+    "(" <l:AExpr> "-" <r:AExpr> ")" => ArithmeticExpr::Sub(Box::new(l), Box::new(r)),
 };
 
 BExpr: BooleanExpr =
@@ -67,13 +71,13 @@ BExpr: BooleanExpr =
     "!" <e:BExpr>               => BooleanExpr::Not(Box::new(e)),
 
     #[precedence(level="3")] #[assoc(side="left")]
-    <l:BExpr> "&&" <r:BExpr>    => BooleanExpr::And(Box::new(l),Box::new(r)),
-    <l:AExpr> "==" <r:AExpr>    => BooleanExpr::NumEq(Box::new(l), Box::new(r)),
-    <l:AExpr> "<=" <r:AExpr>    => BooleanExpr::NumLtEq(Box::new(l), Box::new(r)),
+    "(" <l:BExpr> "&&" <r:BExpr> ")"    => BooleanExpr::And(Box::new(l),Box::new(r)),
+    "(" <l:AExpr> "==" <r:AExpr> ")"    => BooleanExpr::NumEq(Box::new(l), Box::new(r)),
+    "(" <l:AExpr> "<=" <r:AExpr> ")"    => BooleanExpr::NumLtEq(Box::new(l), Box::new(r)),
 
     // --- syntax sugar
-    <l:BExpr> "||" <r:BExpr>    => BooleanExpr::Not(Box::new(BooleanExpr::And(Box::new(BooleanExpr::Not(Box::new(l))), Box::new(BooleanExpr::Not(Box::new(r)))))),
-    <l:AExpr> "<" <r:AExpr>     => BooleanExpr::And(Box::new(BooleanExpr::NumLtEq(Box::new(l.clone()), Box::new(r.clone()))), Box::new(BooleanExpr::Not(Box::new(BooleanExpr::NumEq(Box::new(l.clone()), Box::new(r.clone())))))),
-    <l:AExpr> ">" <r:AExpr>     => BooleanExpr::Not(Box::new(BooleanExpr::NumLtEq(Box::new(l), Box::new(r)))),
-    <l:AExpr> "!=" <r:AExpr>    => BooleanExpr::Not(Box::new(BooleanExpr::NumEq(Box::new(l), Box::new(r)))),
+    "(" <l:BExpr> "||" <r:BExpr> ")"    => BooleanExpr::Not(Box::new(BooleanExpr::And(Box::new(BooleanExpr::Not(Box::new(l))), Box::new(BooleanExpr::Not(Box::new(r)))))),
+    "(" <l:AExpr> "<" <r:AExpr> ")"     => BooleanExpr::And(Box::new(BooleanExpr::NumLtEq(Box::new(l.clone()), Box::new(r.clone()))), Box::new(BooleanExpr::Not(Box::new(BooleanExpr::NumEq(Box::new(l.clone()), Box::new(r.clone())))))),
+    "(" <l:AExpr> ">" <r:AExpr> ")"     => BooleanExpr::Not(Box::new(BooleanExpr::NumLtEq(Box::new(l), Box::new(r)))),
+    "(" <l:AExpr> "!=" <r:AExpr> ")"    => BooleanExpr::Not(Box::new(BooleanExpr::NumEq(Box::new(l), Box::new(r)))),
 };

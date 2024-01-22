@@ -1,4 +1,4 @@
 x := 0;
-while x < 202 do
-    x := x + 50
+while (x < 10) do
+    x++
 done
