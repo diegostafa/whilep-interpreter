@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fs;
 
 pub type State = HashMap<String, i32>;
 
@@ -7,21 +6,12 @@ pub fn create_empty() -> State {
     return HashMap::new();
 }
 
-pub fn create_from_file(state_file: &str) -> State {
-    let content = fs::read_to_string(state_file).expect("couldn't read the state file");
-    let mut state = create_empty();
+pub fn read(state: &State, var: &String) -> i32 {
+    return *state.get(var).expect("[ERROR] undefined variable");
+}
 
-    for line in content.lines() {
-        let (k, v) = match line.split_once(" ") {
-            Some(s) => s,
-            None => panic!("invalid line in state file: {}", line),
-        };
-
-        let var = k.to_string();
-        let val = v.parse::<i32>().expect("couldn't parse value");
-
-        state.insert(var, val);
-    }
-
-    return state;
+pub fn write(state: &State, var: &String, val: i32) -> State {
+    let mut new_state = state.clone();
+    new_state.insert(var.to_string(), val);
+    return new_state;
 }
