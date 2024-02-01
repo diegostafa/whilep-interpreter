@@ -1,9 +1,14 @@
 use std::fs;
 
+use crate::abstract_domain::Interval;
+
+mod abstract_domain;
+mod abstract_semantics;
+mod abstract_state;
 mod ast;
 mod cli;
-mod concrete;
-mod state;
+mod concrete_semantics;
+mod concrete_state;
 
 fn main() {
     println!("[INFO] Parsing the arguments");
@@ -16,13 +21,16 @@ fn main() {
     println!("[INFO] Building the AST");
     let ast = ast::parse(&source).expect("[ERROR] failed to parse the program");
 
+    println!("[INFO] Building the abstract semantics ");
+    let a_semantics = abstract_semantics::denote_statement(ast.clone());
+    let interval = Interval::from_bounds(options.min_interval, options.max_interval);
+
+    println!("[INFO] Evaluating the abstract semantics");
+    println!("{:#?}", a_semantics(abstract_state::create_empty(), vec![]));
+
     println!("[INFO] Building the concrete semantics");
-    let induced_function = concrete::denote_statement(ast);
+    let c_semantics = concrete_semantics::denote_statement(ast.clone());
 
     println!("[INFO] Evaluating the concrete semantics");
-    println!("{:#?}", induced_function(state::create_empty()));
-
-    let m: i32 = options.min_interval;
-    let n: i32 = options.max_interval;
-    println!("[INFO] Testing the interval [{}, {}]", m, n);
+    println!("{:#?}", c_semantics(concrete_state::create_empty()));
 }

@@ -3,8 +3,7 @@ use lalrpop_util::{lalrpop_mod, lexer::Token, ParseError};
 lalrpop_mod!(pub whilep);
 
 pub fn parse(source: &str) -> Result<Statement, ParseError<usize, Token, &'static str>> {
-    let parser = whilep::StmtParser::new();
-    return parser.parse(source);
+    whilep::StmtParser::new().parse(source)
 }
 
 #[derive(Debug, Clone)]

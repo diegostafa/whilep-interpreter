@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::state::*;
+use crate::concrete_state::*;
 
 // --- type aliases
 
@@ -27,7 +27,7 @@ fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
 fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
     Box::new(move |state| {
         let (val, new_state) = denote_aexpr(&val, &state);
-        let new_state = write(&new_state, &var, val);
+        let new_state = write(new_state, &var, val);
         Some(new_state)
     })
 }
@@ -87,11 +87,11 @@ pub fn denote_aexpr(expr: &ArithmeticExpr, state: &State) -> (i32, State) {
         ArithmeticExpr::Identifier(var) => (read(state, var), state.clone()),
         ArithmeticExpr::PostIncrement(var) => {
             let val = read(state, var);
-            (val, write(state, var, val + 1))
+            (val, write(state.clone(), var, val + 1))
         }
         ArithmeticExpr::PostDecrement(var) => {
             let val = read(state, var);
-            (val, write(state, var, val - 1))
+            (val, write(state.clone(), var, val - 1))
         }
         ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
         ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),

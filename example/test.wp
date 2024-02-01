@@ -1,4 +1,4 @@
-x := 0;
-while ((x++ <= 100) && !(true && !true)) do
-    skip
+x := 2003;
+while (x-- > 100) do
+    x--; x--; x--; x--; x--
 done
