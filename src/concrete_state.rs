@@ -6,11 +6,19 @@ pub fn create_empty() -> State {
     HashMap::new()
 }
 
-pub fn read(state: &State, var: &String) -> i32 {
-    *state.get(var).expect("[ERROR] undefined variable")
+pub trait IO {
+    fn read(&self, var: &String) -> i32;
+    fn update(&self, var: &String, val: i32) -> State;
 }
 
-pub fn write(mut state: State, var: &String, val: i32) -> State {
-    state.insert(var.to_string(), val);
-    state
+impl IO for State {
+    fn read(&self, var: &String) -> i32 {
+        *self.get(var).expect("[ERROR] undefined variable")
+    }
+
+    fn update(&self, var: &String, val: i32) -> State {
+        let mut new_state = self.clone();
+        new_state.insert(var.to_string(), val);
+        new_state
+    }
 }

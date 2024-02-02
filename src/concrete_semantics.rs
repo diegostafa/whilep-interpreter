@@ -3,7 +3,6 @@ use crate::concrete_state::*;
 
 // --- type aliases
 
-type StatePredicate = Box<dyn Fn(State) -> (bool, State)>;
 type StateFunction = Box<dyn Fn(State) -> Option<State>>;
 type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
 
@@ -27,17 +26,12 @@ fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
 fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
     Box::new(move |state| {
         let (val, new_state) = denote_aexpr(&val, &state);
-        let new_state = write(new_state, &var, val);
-        Some(new_state)
+        Some(new_state.update(&var, val))
     })
 }
 
-fn predicate(cond: BooleanExpr) -> StatePredicate {
-    Box::new(move |state| denote_bexpr(&cond, &state))
-}
-
-fn conditional(p: StatePredicate, s1: StateFunction, s2: StateFunction) -> StateFunction {
-    Box::new(move |state| match p(state.clone()) {
+fn conditional(cond: BooleanExpr, s1: StateFunction, s2: StateFunction) -> StateFunction {
+    Box::new(move |state| match denote_bexpr(&cond, &state) {
         (true, new_state) => s1(new_state),
         (false, new_state) => s2(new_state),
     })
@@ -58,23 +52,15 @@ fn fix(f: Functional) -> StateFunction {
 
 // --- ast denotation
 
-pub fn denote_statement(ast: Statement) -> StateFunction {
+pub fn denote_stmt(ast: Statement) -> StateFunction {
     match ast {
         Statement::Skip => id(),
-        Statement::Chain(s1, s2) => compose(denote_statement(*s1), denote_statement(*s2)),
+        Statement::Chain(s1, s2) => compose(denote_stmt(*s1), denote_stmt(*s2)),
         Statement::Assignment { var, val } => state_update(var, *val),
-        Statement::If { cond, s1, s2 } => conditional(
-            predicate(*cond),
-            denote_statement(*s1),
-            denote_statement(*s2),
-        ),
+        Statement::If { cond, s1, s2 } => conditional(*cond, denote_stmt(*s1), denote_stmt(*s2)),
         Statement::While { cond, body } => {
             let f = Box::new(move |g| {
-                conditional(
-                    predicate(*cond.clone()),
-                    compose(denote_statement(*body.clone()), g),
-                    id(),
-                )
+                conditional(*cond.clone(), compose(denote_stmt(*body.clone()), g), id())
             });
             fix(f)
         }
@@ -84,14 +70,14 @@ pub fn denote_statement(ast: Statement) -> StateFunction {
 pub fn denote_aexpr(expr: &ArithmeticExpr, state: &State) -> (i32, State) {
     match expr {
         ArithmeticExpr::Number(n) => (*n, state.clone()),
-        ArithmeticExpr::Identifier(var) => (read(state, var), state.clone()),
+        ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
         ArithmeticExpr::PostIncrement(var) => {
-            let val = read(state, var);
-            (val, write(state.clone(), var, val + 1))
+            let val = state.read(var);
+            (val, state.update(var, val + 1))
         }
         ArithmeticExpr::PostDecrement(var) => {
-            let val = read(state, var);
-            (val, write(state.clone(), var, val - 1))
+            let val = state.read(var);
+            (val, state.update(var, val - 1))
         }
         ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
         ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
@@ -104,13 +90,15 @@ pub fn denote_bexpr(expr: &BooleanExpr, state: &State) -> (bool, State) {
     match expr {
         BooleanExpr::True => (true, state.clone()),
         BooleanExpr::False => (false, state.clone()),
-        BooleanExpr::Not(b) => unop_bexpr(|b| !b, b, state),
+        BooleanExpr::Not(b) => denote_bexpr(&desugar_not_bexpr(*b.clone()), state),
         BooleanExpr::And(b1, b2) => binop_bexpr(|a, b| a && b, b1, b2, state),
-        BooleanExpr::NumEq(a1, a2) => binop_comp(|a, b| a == b, a1, a2, state),
-        BooleanExpr::NumLt(a1, a2) => binop_comp(|a, b| a < b, a1, a2, state),
-        BooleanExpr::NumGt(a1, a2) => binop_comp(|a, b| a > b, a1, a2, state),
-        BooleanExpr::NumLtEq(a1, a2) => binop_comp(|a, b| a <= b, a1, a2, state),
-        BooleanExpr::NumGtEq(a1, a2) => binop_comp(|a, b| a >= b, a1, a2, state),
+        BooleanExpr::Or(b1, b2) => binop_bexpr(|a, b| a || b, b1, b2, state),
+        BooleanExpr::NumEq(a1, a2) => binop_cmp(|a, b| a == b, a1, a2, state),
+        BooleanExpr::NumNotEq(a1, a2) => binop_cmp(|a, b| a != b, a1, a2, state),
+        BooleanExpr::NumLt(a1, a2) => binop_cmp(|a, b| a < b, a1, a2, state),
+        BooleanExpr::NumGt(a1, a2) => binop_cmp(|a, b| a > b, a1, a2, state),
+        BooleanExpr::NumLtEq(a1, a2) => binop_cmp(|a, b| a <= b, a1, a2, state),
+        BooleanExpr::NumGtEq(a1, a2) => binop_cmp(|a, b| a >= b, a1, a2, state),
     }
 }
 
@@ -138,12 +126,7 @@ fn binop_bexpr(
     (op(val1, val2), state2)
 }
 
-fn unop_bexpr(op: fn(bool) -> bool, b: &BooleanExpr, state: &State) -> (bool, State) {
-    let (val, state) = denote_bexpr(b, &state);
-    (op(val), state)
-}
-
-fn binop_comp(
+fn binop_cmp(
     op: fn(i32, i32) -> bool,
     a1: &ArithmeticExpr,
     a2: &ArithmeticExpr,

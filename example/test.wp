@@ -1,4 +1,3 @@
 x := 2003;
-while (x-- > 100) do
-    x--; x--; x--; x--; x--
-done
+
+if true then skip end

@@ -23,6 +23,7 @@ TerminalStmt: Statement =
     <x:Identifier> "+=" <e:AExpr> => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Add(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
     <x:Identifier> "-=" <e:AExpr> => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
 
+    "if" <b:BExpr> "then" <s1:Stmt> "end"  => Statement::If{cond:Box::new(b), s1: Box::new(s1), s2: Box::new(Statement::Skip)},
     "if" <b:BExpr> "then" <s1:Stmt> "else" <s2:Stmt> "end"  => Statement::If{cond:Box::new(b), s1: Box::new(s1), s2: Box::new(s2)},
 
     "while" <b:BExpr> "do" <s:Stmt> "done" => Statement::While{cond: Box::new(b), body: Box::new(s)},
@@ -77,13 +78,12 @@ BExpr: BooleanExpr =
     #[precedence(level="3")]
     "!" <e:BExpr>                       => BooleanExpr::Not(Box::new(e)),
     "(" <l:BExpr> "&&" <r:BExpr> ")"    => BooleanExpr::And(Box::new(l),Box::new(r)),
+    "(" <l:BExpr> "||" <r:BExpr> ")"    => BooleanExpr::Or(Box::new(l),Box::new(r)),
     "(" <l:AExpr> "==" <r:AExpr> ")"    => BooleanExpr::NumEq(Box::new(l), Box::new(r)),
+    "(" <l:AExpr> "!=" <r:AExpr> ")"    => BooleanExpr::NumNotEq(Box::new(l), Box::new(r)),
     "(" <l:AExpr> "<" <r:AExpr> ")"     => BooleanExpr::NumLt(Box::new(l), Box::new(r)),
     "(" <l:AExpr> ">" <r:AExpr> ")"     => BooleanExpr::NumGt(Box::new(l), Box::new(r)),
     "(" <l:AExpr> "<=" <r:AExpr> ")"    => BooleanExpr::NumLtEq(Box::new(l), Box::new(r)),
     "(" <l:AExpr> ">=" <r:AExpr> ")"    => BooleanExpr::NumGtEq(Box::new(l), Box::new(r)),
 
-    // --- syntax sugar
-    "(" <l:AExpr> "!=" <r:AExpr> ")"    => BooleanExpr::Not(Box::new(BooleanExpr::NumEq(Box::new(l), Box::new(r)))),
-    "(" <l:BExpr> "||" <r:BExpr> ")"    => BooleanExpr::Not(Box::new(BooleanExpr::And(Box::new(BooleanExpr::Not(Box::new(l))), Box::new(BooleanExpr::Not(Box::new(r)))))),
 };
