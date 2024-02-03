@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::ast::*;
 use crate::concrete_state::*;
 
@@ -26,7 +28,7 @@ fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
 fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
     Box::new(move |state| {
         let (val, new_state) = denote_aexpr(&val, &state);
-        Some(new_state.update(&var, val))
+        Some(new_state.put(&var, val))
     })
 }
 
@@ -71,18 +73,18 @@ pub fn denote_aexpr(expr: &ArithmeticExpr, state: &State) -> (i32, State) {
     match expr {
         ArithmeticExpr::Number(n) => (*n, state.clone()),
         ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
-        ArithmeticExpr::PostIncrement(var) => {
-            let val = state.read(var);
-            (val, state.update(var, val + 1))
-        }
-        ArithmeticExpr::PostDecrement(var) => {
-            let val = state.read(var);
-            (val, state.update(var, val - 1))
-        }
         ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
         ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
         ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
         ArithmeticExpr::Div(a1, a2) => binop_aexpr(|a, b| a / b, a1, a2, state),
+        ArithmeticExpr::PostIncrement(var) => {
+            let val = state.read(var);
+            (val, state.put(var, val + 1))
+        }
+        ArithmeticExpr::PostDecrement(var) => {
+            let val = state.read(var);
+            (val, state.put(var, val - 1))
+        }
     }
 }
 

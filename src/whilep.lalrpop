@@ -50,8 +50,8 @@ TerminalStmt: Statement =
 AExpr: ArithmeticExpr =
 {
     #[precedence(level="1")]
-    <x:Identifier>  => ArithmeticExpr::Identifier(x),
-    <n:Number>      => ArithmeticExpr::Number(n),
+    <x:Identifier>                      => ArithmeticExpr::Identifier(x),
+    <n:Number>                          => ArithmeticExpr::Number(n),
 
     #[precedence(level="2")]
     <x:Identifier> "++" => ArithmeticExpr::PostIncrement(x),

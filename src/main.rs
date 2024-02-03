@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::interval_domain::*;
+use crate::interval::*;
 
 mod abstract_semantics;
 mod abstract_state;
@@ -9,7 +9,8 @@ mod cli;
 mod concrete_semantics;
 mod concrete_state;
 mod integer;
-mod interval_domain;
+mod interval;
+mod lattice;
 
 fn main() {
     println!("[INFO] Parsing the arguments");
@@ -27,11 +28,17 @@ fn main() {
     let interval = interval_from_bounds(options.min_interval, options.max_interval);
 
     println!("[INFO] Evaluating the abstract semantics");
-    println!("{:#?}", a_semantics(abstract_state::create_empty(), vec![]));
+    println!(
+        "{:#?}",
+        a_semantics((
+            abstract_state::empty_state(),
+            abstract_state::empty_points()
+        ))
+    );
 
     println!("[INFO] Building the concrete semantics");
     let c_semantics = concrete_semantics::denote_stmt(ast.clone());
 
     println!("[INFO] Evaluating the concrete semantics");
-    println!("{:#?}", c_semantics(concrete_state::create_empty()));
+    println!("{:#?}", c_semantics(concrete_state::empty_state()));
 }

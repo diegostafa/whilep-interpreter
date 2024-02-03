@@ -9,3 +9,4 @@ lalrpop = "0.20.0"
 [dependencies]
 clap = { version = "4.4.12", features = ["derive"] }
 lalrpop-util = { version = "0.20.0", features = ["lexer", "regex", "unicode"] }
+rand = "0.8.5"
