@@ -1,3 +1,1 @@
-x := 2003;
-
-if true then skip end
+x := (x /0)

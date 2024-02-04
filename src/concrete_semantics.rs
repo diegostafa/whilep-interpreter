@@ -1,7 +1,7 @@
-use rand::Rng;
-
 use crate::ast::*;
 use crate::concrete_state::*;
+use crate::integer::Integer;
+use crate::value_from_interval;
 
 // --- type aliases
 
@@ -69,10 +69,14 @@ pub fn denote_stmt(ast: Statement) -> StateFunction {
     }
 }
 
-pub fn denote_aexpr(expr: &ArithmeticExpr, state: &State) -> (i32, State) {
+pub fn denote_aexpr(expr: &ArithmeticExpr, state: &State) -> (Integer, State) {
     match expr {
         ArithmeticExpr::Number(n) => (*n, state.clone()),
         ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
+        ArithmeticExpr::Interval(a1, a2) => {
+            let (a1_val, a2_val, new_state) = trans_aexpr(a1, a2, &state);
+            (value_from_interval(a1_val, a2_val), new_state)
+        }
         ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
         ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
         ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
@@ -106,15 +110,24 @@ pub fn denote_bexpr(expr: &BooleanExpr, state: &State) -> (bool, State) {
 
 // --- helpers
 
-fn binop_aexpr(
-    op: fn(i32, i32) -> i32,
+fn trans_aexpr(
     a1: &ArithmeticExpr,
     a2: &ArithmeticExpr,
     state: &State,
-) -> (i32, State) {
-    let (val1, state1) = denote_aexpr(a1, &state);
-    let (val2, state2) = denote_aexpr(a2, &state1);
-    (op(val1, val2), state2)
+) -> (Integer, Integer, State) {
+    let (a1_interval, new_state) = denote_aexpr(a1, &state);
+    let (a2_interval, new_state) = denote_aexpr(a2, &new_state);
+    (a1_interval, a2_interval, new_state)
+}
+
+fn binop_aexpr(
+    op: fn(Integer, Integer) -> Integer,
+    a1: &ArithmeticExpr,
+    a2: &ArithmeticExpr,
+    state: &State,
+) -> (Integer, State) {
+    let (a1_val, a2_val, new_state) = trans_aexpr(a1, a2, &state);
+    (op(a1_val, a2_val), new_state)
 }
 
 fn binop_bexpr(
@@ -123,20 +136,19 @@ fn binop_bexpr(
     b2: &BooleanExpr,
     state: &State,
 ) -> (bool, State) {
-    let (val1, state1) = denote_bexpr(b1, &state);
-    let (val2, state2) = denote_bexpr(b2, &state1);
-    (op(val1, val2), state2)
+    let (b1_val, new_state) = denote_bexpr(b1, &state);
+    let (b2_val, new_state) = denote_bexpr(b2, &new_state);
+    (op(b1_val, b2_val), new_state)
 }
 
 fn binop_cmp(
-    op: fn(i32, i32) -> bool,
+    op: fn(Integer, Integer) -> bool,
     a1: &ArithmeticExpr,
     a2: &ArithmeticExpr,
     state: &State,
 ) -> (bool, State) {
-    let (val1, state1) = denote_aexpr(a1, &state);
-    let (val2, state2) = denote_aexpr(a2, &state1);
-    (op(val1, val2), state2)
+    let (a1_val, a2_val, new_state) = trans_aexpr(a1, a2, &state);
+    (op(a1_val, a2_val), new_state)
 }
 
 /*

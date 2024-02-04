@@ -25,20 +25,22 @@ fn main() {
 
     println!("[INFO] Building the abstract semantics ");
     let a_semantics = abstract_semantics::denote_stmt(ast.clone());
-    let interval = interval_from_bounds(options.min_interval, options.max_interval);
+    //let interval = interval_from_bounds(options.min_interval, options.max_interval);
 
     println!("[INFO] Evaluating the abstract semantics");
-    println!(
-        "{:#?}",
-        a_semantics((
-            abstract_state::empty_state(),
-            abstract_state::empty_points()
-        ))
-    );
+    let (a_state, points) = a_semantics((
+        abstract_state::empty_state(),
+        abstract_state::default_invariant(),
+    ));
+
+    println!("ABSTRACT STATE\n{:#?}", a_state);
+    println!("\n");
+    println!("PROGRAM POINTS\n{:#?}", points);
 
     println!("[INFO] Building the concrete semantics");
     let c_semantics = concrete_semantics::denote_stmt(ast.clone());
+    let c_state = c_semantics(concrete_state::empty_state());
 
     println!("[INFO] Evaluating the concrete semantics");
-    println!("{:#?}", c_semantics(concrete_state::empty_state()));
+    println!("CONCRETE STATE\n{:#?}", c_state);
 }

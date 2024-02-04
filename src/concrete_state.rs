@@ -1,18 +1,23 @@
 use std::collections::HashMap;
 
-pub type State = HashMap<String, i32>;
+use crate::integer::Integer;
+
+pub type State = HashMap<String, Integer>;
 
 pub trait IO {
-    fn read(&self, var: &String) -> i32;
-    fn put(&self, var: &String, val: i32) -> State;
+    fn read(&self, var: &String) -> Integer;
+    fn put(&self, var: &String, val: Integer) -> State;
 }
 
 impl IO for State {
-    fn read(&self, var: &String) -> i32 {
-        *self.get(var).expect("[ERROR] undefined variable")
+    fn read(&self, var: &String) -> Integer {
+        match self.get(var) {
+            Some(val) => *val,
+            None => Integer::Value(0),
+        }
     }
 
-    fn put(&self, var: &String, val: i32) -> State {
+    fn put(&self, var: &String, val: Integer) -> State {
         let mut new_state = self.clone();
         new_state.insert(var.to_string(), val);
         new_state

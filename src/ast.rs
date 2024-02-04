@@ -1,5 +1,7 @@
 use lalrpop_util::{lalrpop_mod, lexer::Token, ParseError};
 
+use crate::integer::Integer;
+
 lalrpop_mod!(pub whilep);
 
 pub fn parse(source: &str) -> Result<Statement, ParseError<usize, Token, &'static str>> {
@@ -27,7 +29,8 @@ pub enum Statement {
 
 #[derive(Debug, Clone)]
 pub enum ArithmeticExpr {
-    Number(i32),
+    Number(Integer),
+    Interval(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Identifier(String),
     PostIncrement(String),
     PostDecrement(String),

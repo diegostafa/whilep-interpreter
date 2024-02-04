@@ -1,4 +1,7 @@
-use std::ops::{self};
+use std::{
+    ops::{self},
+    str::FromStr,
+};
 
 pub enum Sign {
     Neg,
@@ -11,6 +14,18 @@ pub enum Integer {
     NegInf,
     Value(i32),
     PosInf,
+}
+
+impl FromStr for Integer {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "minf" => Ok(Integer::NegInf),
+            "pinf" => Ok(Integer::PosInf),
+            _ => s.parse::<i32>().map(Integer::Value),
+        }
+    }
 }
 
 impl ops::Neg for Integer {
@@ -30,7 +45,7 @@ impl ops::Add<Integer> for Integer {
 
     fn add(self, other: Self) -> Self {
         match (self, other) {
-            (Integer::Value(a), Integer::Value(b)) => Integer::Value(a + b),
+            (Integer::Value(_), Integer::Value(b)) => self + b,
 
             (Integer::PosInf, Integer::PosInf)
             | (Integer::PosInf, Integer::Value(_))
@@ -90,12 +105,23 @@ impl ops::Div<Integer> for Integer {
 impl ops::Add<i32> for Integer {
     type Output = Self;
 
-    fn add(self, other: i32) -> Self {
+    fn add(self, int: i32) -> Self {
         match self {
             Integer::PosInf => Integer::PosInf,
-            Integer::Value(v) => Integer::Value(v + other),
             Integer::NegInf => Integer::NegInf,
+            Integer::Value(n) => match n.checked_add(int) {
+                Some(val) => Integer::Value(val),
+                None => Integer::PosInf,
+            },
         }
+    }
+}
+
+impl ops::Sub<i32> for Integer {
+    type Output = Self;
+
+    fn sub(self, other: i32) -> Self {
+        self + -other
     }
 }
 

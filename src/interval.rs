@@ -3,6 +3,8 @@ use std::{
     ops,
 };
 
+use rand::Rng;
+
 use crate::{integer::*, lattice::Lattice};
 
 #[derive(Debug, Clone, Copy, Eq)]
@@ -211,10 +213,6 @@ impl Lattice for Interval {
     }
 }
 
-pub fn interval_from_value(val: i32) -> Interval {
-    Interval::Range(Integer::Value(val), Integer::Value(val))
-}
-
 pub fn interval_from_bounds(min: Option<i32>, max: Option<i32>) -> Interval {
     match (min, max) {
         (Some(min), Some(max)) => Interval::Range(Integer::Value(min), Integer::Value(max)),
@@ -222,4 +220,21 @@ pub fn interval_from_bounds(min: Option<i32>, max: Option<i32>) -> Interval {
         (_, Some(max)) => Interval::Range(Integer::NegInf, Integer::Value(max)),
         (_, _) => Interval::Range(Integer::NegInf, Integer::PosInf),
     }
+}
+
+pub fn value_from_interval(min: Integer, max: Integer) -> Integer {
+    let rng: f32 = rand::thread_rng().gen();
+    let min = match min {
+        Integer::Value(v) => v,
+        Integer::NegInf => std::i32::MIN / 2,
+        Integer::PosInf => std::i32::MAX / 2,
+    };
+
+    let max = match max {
+        Integer::Value(v) => v,
+        Integer::NegInf => std::i32::MIN / 2,
+        Integer::PosInf => std::i32::MAX / 2,
+    };
+
+    Integer::Value((rng * (min - max) as f32) as i32 + min)
 }
