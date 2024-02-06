@@ -1,7 +1,10 @@
 use std::{
+    fmt::{self},
     ops::{self},
     str::FromStr,
 };
+
+use rand::Rng;
 
 pub enum Sign {
     Neg,
@@ -16,14 +19,27 @@ pub enum Integer {
     PosInf,
 }
 
+impl fmt::Display for Integer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Integer::NegInf => write!(f, "neginf"),
+            Integer::Value(v) => write!(f, "{}", v),
+            Integer::PosInf => write!(f, "posinf"),
+        }
+    }
+}
+
 impl FromStr for Integer {
     type Err = std::num::ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "minf" => Ok(Integer::NegInf),
-            "pinf" => Ok(Integer::PosInf),
-            _ => s.parse::<i32>().map(Integer::Value),
+            "neginf" => Ok(Integer::NegInf),
+            "posinf" => Ok(Integer::PosInf),
+            _ => match s.parse::<i32>() {
+                Ok(v) => Ok(Integer::Value(v)),
+                Err(e) => Err(e),
+            },
         }
     }
 }
@@ -95,9 +111,14 @@ impl ops::Div<Integer> for Integer {
         match (self, other) {
             (a, _) if a == zero => zero,
             (_, Integer::PosInf) | (_, Integer::NegInf) => zero,
+            (Integer::NegInf, b) if b > zero => Integer::NegInf,
+            (Integer::NegInf, b) if b < zero => Integer::PosInf,
+            (Integer::PosInf, b) if b < zero => Integer::NegInf,
+            (Integer::PosInf, b) if b > zero => Integer::NegInf,
             (Integer::Value(a), b) if a > 0 && b == zero => Integer::PosInf,
             (Integer::Value(a), b) if a < 0 && b == zero => Integer::NegInf,
-            _ => panic!("[ERROR] "),
+            (Integer::Value(a), Integer::Value(b)) => Integer::Value(a / b),
+            _ => unreachable!(),
         }
     }
 }
@@ -134,4 +155,21 @@ fn sign(i: Integer) -> Sign {
         Integer::PosInf => Sign::Pos,
         _ => unreachable!(),
     }
+}
+
+pub fn random_integer_between(min: Integer, max: Integer) -> Integer {
+    let rng: f32 = rand::thread_rng().gen();
+    let min = match min {
+        Integer::Value(v) => v,
+        Integer::NegInf => std::i32::MIN / 2,
+        Integer::PosInf => std::i32::MAX / 2,
+    };
+
+    let max = match max {
+        Integer::Value(v) => v,
+        Integer::NegInf => std::i32::MIN / 2,
+        Integer::PosInf => std::i32::MAX / 2,
+    };
+
+    Integer::Value((rng * (max - min) as f32) as i32 + min)
 }

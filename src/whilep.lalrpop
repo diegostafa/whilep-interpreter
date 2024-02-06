@@ -35,7 +35,7 @@ TerminalStmt: Statement =
                 cond: Box::new(BooleanExpr::Not(Box::new(b))),
                 body: Box::new(s.clone())})),
 
-    "for" <x:Identifier> "in"  "[" <from:AExpr> ".."  <to:AExpr> "]" "do" <s:Stmt> "done"
+    "for" <x:Identifier> "in"  "[" <from:AExpr> ","  <to:AExpr> "]" "do" <s:Stmt> "done"
         => Statement::Chain(
             Box::new(Statement::Assignment{var: x.clone(), val: Box::new(from)}),
             Box::new(Statement::While{
@@ -57,16 +57,15 @@ AExpr: ArithmeticExpr =
     <x:Identifier> "++" => ArithmeticExpr::PostIncrement(x),
     <x:Identifier> "--" => ArithmeticExpr::PostDecrement(x),
 
-
     #[precedence(level="4")]
     "(" <l:AExpr> "*" <r:AExpr> ")" => ArithmeticExpr::Mul(Box::new(l), Box::new(r)),
-    "(" <l:AExpr> "/" <r:AExpr> ")" => ArithmeticExpr::Div(Box::new(l), Box::new(r)),
 
     #[precedence(level="5")]
     "(" <l:AExpr> "+" <r:AExpr> ")" => ArithmeticExpr::Add(Box::new(l), Box::new(r)),
     "(" <l:AExpr> "-" <r:AExpr> ")" => ArithmeticExpr::Sub(Box::new(l), Box::new(r)),
-    "[" <l:AExpr> "," <r:AExpr> "]" => ArithmeticExpr::Interval(Box::new(l), Box::new(r)),
-    "-" <a:AExpr> => ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Number(Integer::Value(0))), Box::new(a)),
+    "[" <n:Number> "," <m:Number> "]" => ArithmeticExpr::Interval(n, m),
+    "-" <a:AExpr>                   => ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Number(Integer::Value(0))), Box::new(a)),
+    "(" <l:AExpr> "/" <r:AExpr> ")" => ArithmeticExpr::Div(Box::new(l), Box::new(r)),
 };
 
 BExpr: BooleanExpr =

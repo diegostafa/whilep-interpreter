@@ -1,7 +1,6 @@
 use crate::ast::*;
 use crate::concrete_state::*;
-use crate::integer::Integer;
-use crate::value_from_interval;
+use crate::integer::*;
 
 // --- type aliases
 
@@ -27,18 +26,23 @@ fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
 
 fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
     Box::new(move |state| {
-        let (val, new_state) = denote_aexpr(&val, &state);
+        let (val, new_state) = eval_aexpr(&val, &state);
         Some(new_state.put(&var, val))
     })
 }
 
 fn conditional(cond: BooleanExpr, s1: StateFunction, s2: StateFunction) -> StateFunction {
-    Box::new(move |state| match denote_bexpr(&cond, &state) {
+    Box::new(move |state| match eval_bexpr(&cond, &state) {
         (true, new_state) => s1(new_state),
-        (false, new_state) => s2(new_state),
+        (_, new_state) => s2(new_state),
     })
 }
 
+/**
+* compute the least upper bound of f
+* by recursively applying f (starting from bottom)
+* until the first valid state is reached
+*/
 fn fix(f: Functional) -> StateFunction {
     Box::new(move |state| {
         let mut g = bottom();
@@ -69,14 +73,11 @@ pub fn denote_stmt(ast: Statement) -> StateFunction {
     }
 }
 
-pub fn denote_aexpr(expr: &ArithmeticExpr, state: &State) -> (Integer, State) {
+pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> (Integer, State) {
     match expr {
         ArithmeticExpr::Number(n) => (*n, state.clone()),
+        ArithmeticExpr::Interval(n, m) => (random_integer_between(*n, *m), state.clone()),
         ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
-        ArithmeticExpr::Interval(a1, a2) => {
-            let (a1_val, a2_val, new_state) = trans_aexpr(a1, a2, &state);
-            (value_from_interval(a1_val, a2_val), new_state)
-        }
         ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
         ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
         ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
@@ -92,11 +93,11 @@ pub fn denote_aexpr(expr: &ArithmeticExpr, state: &State) -> (Integer, State) {
     }
 }
 
-pub fn denote_bexpr(expr: &BooleanExpr, state: &State) -> (bool, State) {
+pub fn eval_bexpr(expr: &BooleanExpr, state: &State) -> (bool, State) {
     match expr {
         BooleanExpr::True => (true, state.clone()),
         BooleanExpr::False => (false, state.clone()),
-        BooleanExpr::Not(b) => denote_bexpr(&desugar_not_bexpr(*b.clone()), state),
+        BooleanExpr::Not(b) => eval_bexpr(&desugar_not_bexpr(*b.clone()), state),
         BooleanExpr::And(b1, b2) => binop_bexpr(|a, b| a && b, b1, b2, state),
         BooleanExpr::Or(b1, b2) => binop_bexpr(|a, b| a || b, b1, b2, state),
         BooleanExpr::NumEq(a1, a2) => binop_cmp(|a, b| a == b, a1, a2, state),
@@ -115,8 +116,8 @@ fn trans_aexpr(
     a2: &ArithmeticExpr,
     state: &State,
 ) -> (Integer, Integer, State) {
-    let (a1_interval, new_state) = denote_aexpr(a1, &state);
-    let (a2_interval, new_state) = denote_aexpr(a2, &new_state);
+    let (a1_interval, new_state) = eval_aexpr(a1, &state);
+    let (a2_interval, new_state) = eval_aexpr(a2, &new_state);
     (a1_interval, a2_interval, new_state)
 }
 
@@ -136,8 +137,8 @@ fn binop_bexpr(
     b2: &BooleanExpr,
     state: &State,
 ) -> (bool, State) {
-    let (b1_val, new_state) = denote_bexpr(b1, &state);
-    let (b2_val, new_state) = denote_bexpr(b2, &new_state);
+    let (b1_val, new_state) = eval_bexpr(b1, &state);
+    let (b2_val, new_state) = eval_bexpr(b2, &new_state);
     (op(b1_val, b2_val), new_state)
 }
 
@@ -151,8 +152,7 @@ fn binop_cmp(
     (op(a1_val, a2_val), new_state)
 }
 
-/*
---- ALTERNATIVE IMPLEMENTATIONS
+/* ALTERNATIVE IMPLEMENTATIONS
 
 fn rec_self_apply(f: &Functional, n: i32, inp: StateFunction) -> StateFunction {
     match n {

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::integer::Integer;
+use crate::{integer::Integer, PrettyPrint};
 
 pub type State = HashMap<String, Integer>;
 
@@ -26,4 +26,16 @@ impl IO for State {
 
 pub fn empty_state() -> State {
     HashMap::new()
+}
+
+impl PrettyPrint for State {
+    fn pretty_print(&self) {
+        let mut pretty_state = self
+            .iter()
+            .map(|(var, val)| format!("{}: {}", var, val))
+            .collect::<Vec<String>>();
+
+        pretty_state.sort();
+        println!("\t {}", pretty_state.join(", "));
+    }
 }

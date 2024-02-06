@@ -1,9 +1,8 @@
 use std::{
     cmp::{self, Ordering},
-    ops,
+    fmt,
+    ops::{self},
 };
-
-use rand::Rng;
 
 use crate::{integer::*, lattice::Lattice};
 
@@ -13,12 +12,26 @@ pub enum Interval {
     Range(Integer, Integer),
 }
 
+impl fmt::Display for Interval {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Interval::Bottom => write!(f, "Empty interval"),
+            Interval::Range(a, b) => write!(f, "[{}, {}]", a, b),
+        }
+    }
+}
+
 pub trait IntervalOperations {
-    fn add_i32(&self, other: i32) -> Self;
+    fn shift(&self, val: Integer) -> Self;
+
     fn contains(&self, other: Self) -> bool;
     fn on_left(&self, other: Self) -> bool;
     fn on_right(&self, other: Self) -> bool;
     fn overlaps(&self, other: Self) -> bool;
+    fn difference(&self, other: Self) -> Self;
+
+    fn clamp_min(&self, other: Self) -> Self;
+    fn clamp_max(&self, other: Self) -> Self;
 }
 
 impl ops::Neg for Interval {
@@ -108,11 +121,12 @@ impl ops::Div<Interval> for Interval {
 impl PartialOrd for Interval {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (*self, *other) {
+            (Interval::Bottom, _) => Some(Ordering::Less),
+            (_, Interval::Bottom) => None,
             (Interval::Range(a, b), Interval::Range(c, d)) => match a >= c && b <= d {
                 true => Some(Ordering::Less),
                 _ => None,
             },
-            (Interval::Bottom, _) | (_, Interval::Bottom) => None,
         }
     }
 }
@@ -128,12 +142,13 @@ impl PartialEq for Interval {
 }
 
 impl IntervalOperations for Interval {
-    fn add_i32(&self, val: i32) -> Self {
+    fn shift(&self, val: Integer) -> Self {
         match *self {
             Interval::Bottom => Interval::Bottom,
-            Interval::Range(min, max) => Interval::Range(min + val, max),
+            Interval::Range(min, max) => Interval::Range(min + val, max + val),
         }
     }
+
     fn contains(&self, other: Self) -> bool {
         match (*self, other) {
             (Interval::Bottom, _) => false,
@@ -157,9 +172,38 @@ impl IntervalOperations for Interval {
     }
 
     fn overlaps(&self, other: Self) -> bool {
-        match self.intersection(other) {
-            Interval::Bottom => false,
-            _ => true,
+        self.intersection(other) != Interval::Bottom
+    }
+
+    fn difference(&self, other: Self) -> Self {
+        match (*self, other) {
+            (Interval::Bottom, _) => Interval::Bottom,
+            (a, Interval::Bottom) => a,
+            (Interval::Range(a, b), Interval::Range(c, d)) if c <= a && d >= b => Interval::Bottom,
+            (Interval::Range(a, b), Interval::Range(c, d)) if c >= a && d <= b => self.clone(),
+            (Interval::Range(a, b), Interval::Range(c, d)) if c <= a && d <= b => {
+                Interval::Range(d + 1, b)
+            }
+            (Interval::Range(a, b), Interval::Range(c, d)) if c >= a && d >= b => {
+                Interval::Range(a, c - 1)
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn clamp_min(&self, other: Self) -> Self {
+        match (*self, other) {
+            (Interval::Bottom, _) => Interval::Bottom,
+            (_, Interval::Bottom) => self.clone(),
+            (Interval::Range(a, b), Interval::Range(c, _)) => Interval::Range(cmp::min(a, c), b),
+        }
+    }
+
+    fn clamp_max(&self, other: Self) -> Self {
+        match (*self, other) {
+            (Interval::Bottom, _) => Interval::Bottom,
+            (_, Interval::Bottom) => self.clone(),
+            (Interval::Range(a, b), Interval::Range(_, d)) => Interval::Range(a, cmp::max(b, d)),
         }
     }
 }
@@ -179,10 +223,8 @@ impl Lattice for Interval {
         match (*self, other) {
             (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
             (Interval::Range(a, b), Interval::Range(c, d)) => {
-                let min = cmp::max(a, c);
-                let max = cmp::min(b, d);
-                match min < max {
-                    true => Interval::Range(min, max),
+                match (cmp::max(a, c), cmp::min(b, d)) {
+                    (min, max) if min <= max => Interval::Range(min, max),
                     _ => Interval::Bottom,
                 }
             }
@@ -211,30 +253,4 @@ impl Lattice for Interval {
             }
         }
     }
-}
-
-pub fn interval_from_bounds(min: Option<i32>, max: Option<i32>) -> Interval {
-    match (min, max) {
-        (Some(min), Some(max)) => Interval::Range(Integer::Value(min), Integer::Value(max)),
-        (Some(min), _) => Interval::Range(Integer::Value(min), Integer::PosInf),
-        (_, Some(max)) => Interval::Range(Integer::NegInf, Integer::Value(max)),
-        (_, _) => Interval::Range(Integer::NegInf, Integer::PosInf),
-    }
-}
-
-pub fn value_from_interval(min: Integer, max: Integer) -> Integer {
-    let rng: f32 = rand::thread_rng().gen();
-    let min = match min {
-        Integer::Value(v) => v,
-        Integer::NegInf => std::i32::MIN / 2,
-        Integer::PosInf => std::i32::MAX / 2,
-    };
-
-    let max = match max {
-        Integer::Value(v) => v,
-        Integer::NegInf => std::i32::MIN / 2,
-        Integer::PosInf => std::i32::MAX / 2,
-    };
-
-    Integer::Value((rng * (min - max) as f32) as i32 + min)
 }

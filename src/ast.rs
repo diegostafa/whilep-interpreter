@@ -30,7 +30,7 @@ pub enum Statement {
 #[derive(Debug, Clone)]
 pub enum ArithmeticExpr {
     Number(Integer),
-    Interval(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
+    Interval(Integer, Integer),
     Identifier(String),
     PostIncrement(String),
     PostDecrement(String),
@@ -75,4 +75,8 @@ pub fn desugar_not_bexpr(expr: BooleanExpr) -> BooleanExpr {
         BooleanExpr::NumLtEq(a1, a2) => BooleanExpr::NumGt(a1, a2),
         BooleanExpr::NumGtEq(a1, a2) => BooleanExpr::NumLt(a1, a2),
     }
+}
+
+pub fn negate_bexpr(expr: &BooleanExpr) -> BooleanExpr {
+    BooleanExpr::Not(Box::new(expr.clone()))
 }

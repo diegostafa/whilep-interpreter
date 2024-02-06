@@ -1,105 +1,129 @@
 use crate::abstract_state::*;
 use crate::ast::*;
+use crate::integer::Integer;
 use crate::interval::*;
 use crate::lattice::*;
 
-// --- type aliases
-
-type StateFunction = Box<dyn Fn((State, Invariant)) -> (State, Invariant)>;
-
-// --- semantic functions
-
-fn id() -> StateFunction {
-    Box::new(|(state, inv)| (state.clone(), concat(&[inv, vec![state]])))
+fn g(cond: BooleanExpr, body: Statement, (state, inv): (State, Invariant)) -> (State, Invariant) {
+    let (new_s, new_i) = eval_stmt(body, (eval_bexpr(&cond.clone(), &state), inv));
+    (state.union(new_s), new_i)
 }
 
-fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
-    Box::new(move |(state, inv)| g(f((state, inv))))
-}
-
-fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
-    Box::new(move |(state, inv)| {
-        let (val, new_state) = denote_aexpr(&val, &state);
-        let new_state = new_state.put(&var, val);
-        (new_state.clone(), concat(&[inv, vec![new_state]]))
-    })
-}
-
-fn conditional(cond: BooleanExpr, s1: StateFunction, s2: StateFunction) -> StateFunction {
-    Box::new(move |(state, inv)| {
-        let tt_state = denote_bexpr(&cond, &state);
-        let ff_state = denote_bexpr(&BooleanExpr::Not(Box::new(cond.clone())), &state);
-        let (s1_state, s1_inv) = s1((tt_state.clone(), default_invariant()));
-        let (s2_state, s2_inv) = s2((ff_state.clone(), default_invariant()));
-
-        (
-            s1_state.union(s2_state),
-            concat(&[inv, vec![tt_state], s1_inv, vec![ff_state], s2_inv]),
-        )
-    })
-}
-
-fn fix(f: StateFunction) -> StateFunction {
-    Box::new(move |(state, inv)| todo!())
-}
-
-// --- ast denotation
-
-pub fn denote_stmt(ast: Statement) -> StateFunction {
+pub fn eval_stmt(ast: Statement, (state, inv): (State, Invariant)) -> (State, Invariant) {
     match ast {
-        Statement::Skip => id(),
-        Statement::Assignment { var, val } => state_update(var, *val),
-        Statement::Chain(s1, s2) => compose(denote_stmt(*s1), denote_stmt(*s2)),
-        Statement::If { cond, s1, s2 } => conditional(*cond, denote_stmt(*s1), denote_stmt(*s2)),
-        Statement::While { cond, body } => todo!(),
+        Statement::Skip => (state.clone(), concat(&[inv, vec![(state)]])),
+
+        Statement::Assignment { var, val } => {
+            let (interval, new_state) = eval_aexpr(&val, &state);
+            let new_state = new_state.put(&var, interval);
+            (new_state.clone(), concat(&[inv, vec![new_state]]))
+        }
+
+        Statement::Chain(s1, s2) => eval_stmt(*s2, eval_stmt(*s1, (state, inv))),
+
+        Statement::If { cond, s1, s2 } => {
+            let tt_state = eval_bexpr(&cond, &state);
+            let ff_state = eval_bexpr(&negate_bexpr(&cond), &state);
+            let (s1_state, s1_inv) = eval_stmt(*s1, (tt_state.clone(), default_invariant()));
+            let (s2_state, s2_inv) = eval_stmt(*s2, (ff_state.clone(), default_invariant()));
+            (
+                s1_state.union(s2_state),
+                concat(&[inv, vec![tt_state], s1_inv, vec![ff_state], s2_inv]),
+            )
+        }
+
+        Statement::While { cond, body } => {
+            let mut new_s = State::Bottom;
+            let mut new_inv = inv.clone();
+            while new_s == State::Bottom {
+                (new_s, new_inv) = g(*cond.clone(), *body.clone(), (state.clone(), inv.clone()));
+            }
+
+            (eval_bexpr(&negate_bexpr(&cond), &new_s), new_inv)
+        }
     }
 }
 
-pub fn denote_aexpr(expr: &ArithmeticExpr, state: &State) -> (Interval, State) {
+pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> (Interval, State) {
     match expr {
         ArithmeticExpr::Number(n) => (Interval::Range(*n, *n), state.clone()),
+        ArithmeticExpr::Interval(n, m) => (Interval::Range(*n, *m), state.clone()),
         ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
         ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
         ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
         ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
         ArithmeticExpr::Div(a1, a2) => binop_aexpr(|a, b| a / b, a1, a2, state),
-
         ArithmeticExpr::PostIncrement(var) => {
             let interval = state.read(var);
-            (interval, state.put(var, interval.add_i32(1)))
+            (interval, state.put(var, interval.shift(Integer::Value(1))))
         }
         ArithmeticExpr::PostDecrement(var) => {
             let interval = state.read(var);
-            (interval, state.put(var, interval.add_i32(-1)))
-        }
-        ArithmeticExpr::Interval(a1, a2) => {
-            let (a1_interval, a2_interval, new_state) = trans_aexpr(a1, a2, &state);
-            match (a1_interval, a2_interval) {
-                (Interval::Range(a, _), Interval::Range(_, d)) if a <= d => {
-                    (Interval::Range(a, d), new_state)
-                }
-                _ => (Interval::Bottom, state.clone()),
-            }
+            (interval, state.put(var, interval.shift(Integer::Value(-1))))
         }
     }
 }
 
-pub fn denote_bexpr(expr: &BooleanExpr, state: &State) -> State {
+pub fn eval_bexpr(expr: &BooleanExpr, state: &State) -> State {
     match expr {
         BooleanExpr::True => state.clone(),
-        BooleanExpr::False => None,
-        BooleanExpr::Not(b) => denote_bexpr(&desugar_not_bexpr(*b.clone()), state),
-        BooleanExpr::And(b1, b2) => denote_bexpr(b1, state).intersection(denote_bexpr(b2, state)),
-        BooleanExpr::Or(b1, b2) => denote_bexpr(b1, state).union(denote_bexpr(b2, state)),
-        BooleanExpr::NumEq(a1, a2) => binop_cmp(|i1, i2| i1.overlaps(i2), a1, a2, state),
-        BooleanExpr::NumNotEq(a1, a2) => binop_cmp(|i1, i2| !i1.overlaps(i2), a1, a2, state),
-        BooleanExpr::NumLt(a1, a2) => binop_cmp(|i1, i2| !i1.on_right(i2), a1, a2, state),
-        BooleanExpr::NumGt(a1, a2) => binop_cmp(|i1, i2| !i1.on_left(i2), a1, a2, state),
+        BooleanExpr::False => State::Bottom,
+        BooleanExpr::Not(b) => eval_bexpr(&desugar_not_bexpr(*b.clone()), state),
+        BooleanExpr::And(b1, b2) => eval_bexpr(b1, state).intersection(eval_bexpr(b2, state)),
+        BooleanExpr::Or(b1, b2) => eval_bexpr(b1, state).union(eval_bexpr(b2, state)),
+        BooleanExpr::NumEq(a1, a2) => {
+            let (a1_interval, a2_interval, new_state) = trans_aexpr(a1, a2, &state);
+            match a1_interval.intersection(a2_interval) {
+                Interval::Bottom => State::Bottom,
+                intersection => new_state
+                    .try_put(a1, intersection)
+                    .try_put(a2, intersection),
+            }
+        }
+        BooleanExpr::NumNotEq(a1, a2) => {
+            let (a1_interval, a2_interval, new_state) = trans_aexpr(a1, a2, &state);
+            match a1_interval.intersection(a2_interval) {
+                Interval::Bottom => new_state,
+                intersection => new_state
+                    .try_put(a1, a1_interval.difference(intersection))
+                    .try_put(a2, a2_interval.difference(intersection)),
+            }
+        }
+        BooleanExpr::NumLt(a1, a2) => {
+            let (a1_interval, a2_interval, new_state) = trans_aexpr(a1, a2, &state);
+            match a1_interval.on_right(a2_interval) {
+                true => State::Bottom,
+                _ => new_state
+                    .try_put(a1, a1_interval.clamp_max(a2_interval))
+                    .try_put(a2, a2_interval.clamp_min(a1_interval)),
+            }
+        }
+        BooleanExpr::NumGt(a1, a2) => {
+            let (a1_interval, a2_interval, new_state) = trans_aexpr(a1, a2, &state);
+            match a1_interval.on_left(a2_interval) {
+                true => State::Bottom,
+                _ => new_state
+                    .try_put(a1, a1_interval.clamp_min(a2_interval))
+                    .try_put(a2, a2_interval.clamp_max(a1_interval)),
+            }
+        }
         BooleanExpr::NumLtEq(a1, a2) => {
-            binop_cmp(|i1, i2| !i1.on_right(i2) && !i1.overlaps(i2), a1, a2, state)
+            let (a1_interval, a2_interval, new_state) = trans_aexpr(a1, a2, &state);
+            match a1_interval.on_right(a2_interval) && !a1_interval.overlaps(a2_interval) {
+                true => State::Bottom,
+                _ => new_state
+                    .try_put(a1, a1_interval.clamp_max(a2_interval))
+                    .try_put(a2, a2_interval.clamp_min(a1_interval)),
+            }
         }
         BooleanExpr::NumGtEq(a1, a2) => {
-            binop_cmp(|i1, i2| !i1.on_left(i2) && !i1.overlaps(i2), a1, a2, state)
+            let (a1_interval, a2_interval, new_state) = trans_aexpr(a1, a2, &state);
+            match a1_interval.on_left(a2_interval) && !a1_interval.overlaps(a2_interval) {
+                true => State::Bottom,
+                _ => new_state
+                    .try_put(a1, a1_interval.clamp_max(a2_interval))
+                    .try_put(a2, a2_interval.clamp_min(a1_interval)),
+            }
         }
     }
 }
@@ -111,8 +135,8 @@ fn trans_aexpr(
     a2: &ArithmeticExpr,
     state: &State,
 ) -> (Interval, Interval, State) {
-    let (a1_interval, new_state) = denote_aexpr(a1, &state);
-    let (a2_interval, new_state) = denote_aexpr(a2, &new_state);
+    let (a1_interval, new_state) = eval_aexpr(a1, &state);
+    let (a2_interval, new_state) = eval_aexpr(a2, &new_state);
     (a1_interval, a2_interval, new_state)
 }
 
@@ -124,17 +148,4 @@ fn binop_aexpr(
 ) -> (Interval, State) {
     let (a1_interval, a2_interval, new_state) = trans_aexpr(a1, a2, &state);
     (op(a1_interval, a2_interval), new_state)
-}
-
-fn binop_cmp(
-    cond: fn(Interval, Interval) -> bool,
-    a1: &ArithmeticExpr,
-    a2: &ArithmeticExpr,
-    state: &State,
-) -> State {
-    let (a1_interval, a2_interval, new_state) = trans_aexpr(a1, a2, &state);
-    match cond(a1_interval, a2_interval) {
-        true => new_state,
-        _ => None,
-    }
 }
