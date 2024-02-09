@@ -4,30 +4,30 @@ use crate::integer::*;
 
 // --- type aliases
 
-type StateFunction = Box<dyn Fn(State) -> Option<State>>;
+type StateFunction = Box<dyn Fn(State) -> State>;
 type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
 
 // --- semantic functions
 
 fn bottom() -> StateFunction {
-    Box::new(|_| None)
+    Box::new(|_| State::Bottom)
 }
 
 fn id() -> StateFunction {
-    Box::new(|state| Some(state))
+    Box::new(|state| state)
 }
 
 fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
     Box::new(move |state| match f(state.clone()) {
-        Some(new_state) => g(new_state),
-        None => None,
+        State::Bottom => state,
+        _ => g(state),
     })
 }
 
 fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
     Box::new(move |state| {
         let (val, new_state) = eval_aexpr(&val, &state);
-        Some(new_state.put(&var, val))
+        new_state.put(&var, val)
     })
 }
 
@@ -38,19 +38,15 @@ fn conditional(cond: BooleanExpr, s1: StateFunction, s2: StateFunction) -> State
     })
 }
 
-/**
-* compute the least upper bound of f
-* by recursively applying f (starting from bottom)
-* until the first valid state is reached
-*/
 fn fix(f: Functional) -> StateFunction {
     Box::new(move |state| {
         let mut g = bottom();
         loop {
             g = f(g);
             let final_state = g(state.clone());
-            if final_state.is_some() {
-                return final_state;
+            match final_state {
+                State::Bottom => continue,
+                _ => break final_state,
             }
         }
     })
@@ -116,9 +112,9 @@ fn trans_aexpr(
     a2: &ArithmeticExpr,
     state: &State,
 ) -> (Integer, Integer, State) {
-    let (a1_interval, new_state) = eval_aexpr(a1, &state);
-    let (a2_interval, new_state) = eval_aexpr(a2, &new_state);
-    (a1_interval, a2_interval, new_state)
+    let (i1, new_state) = eval_aexpr(a1, &state);
+    let (i2, new_state) = eval_aexpr(a2, &new_state);
+    (i1, i2, new_state)
 }
 
 fn binop_aexpr(
@@ -151,46 +147,3 @@ fn binop_cmp(
     let (a1_val, a2_val, new_state) = trans_aexpr(a1, a2, &state);
     (op(a1_val, a2_val), new_state)
 }
-
-/* ALTERNATIVE IMPLEMENTATIONS
-
-fn rec_self_apply(f: &Functional, n: i32, inp: StateFunction) -> StateFunction {
-    match n {
-        0 => inp,
-        _ => rec_self_apply(f, n - 1, f(inp)),
-    }
-}
-
-fn fix3(f: Functional) -> StateFunction {
-    Box::new(move |state| {
-        let mut n = 0;
-        loop {
-            let new_state = rec_self_apply(&f, n, bottom())(state.clone());
-            if new_state.is_some() {
-                return new_state;
-            }
-            n += 1;
-        }
-    })
-}
-
-fn fix2(f: Functional) -> StateFunction {
-    Box::new(move |state| {
-        let mut n = 0;
-
-        loop {
-            let mut g = bottom();
-            for _ in 0..n {
-                g = f(g);
-            }
-
-            let final_state = g(state.clone());
-            if final_state.is_some() {
-                return final_state;
-            }
-
-            n += 1;
-        }
-    })
-}
-*/

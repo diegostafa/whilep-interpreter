@@ -4,7 +4,7 @@ use std::{
     ops::{self},
 };
 
-use crate::{integer::*, lattice::Lattice};
+use crate::integer::*;
 
 #[derive(Debug, Clone, Copy, Eq)]
 pub enum Interval {
@@ -12,27 +12,72 @@ pub enum Interval {
     Range(Integer, Integer),
 }
 
-impl fmt::Display for Interval {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Interval::Bottom => write!(f, "Empty interval"),
-            Interval::Range(a, b) => write!(f, "[{}, {}]", a, b),
+impl Interval {
+    pub fn shift(&self, val: Integer) -> Self {
+        self.add_min(val).add_max(val)
+    }
+
+    pub fn add_min(&self, val: Integer) -> Self {
+        match *self {
+            Interval::Bottom => Interval::Bottom,
+            Interval::Range(min, max) => Interval::Range(min + val, max),
+        }
+    }
+
+    pub fn add_max(&self, val: Integer) -> Self {
+        match *self {
+            Interval::Bottom => Interval::Bottom,
+            Interval::Range(min, max) => Interval::Range(min, max + val),
+        }
+    }
+
+    pub fn union(&self, other: Self) -> Self {
+        match (*self, other) {
+            (a, Interval::Bottom) => a,
+            (Interval::Bottom, b) => b,
+            (Interval::Range(a, b), Interval::Range(c, d)) => {
+                Interval::Range(cmp::min(a, c), cmp::max(b, d))
+            }
+        }
+    }
+
+    pub fn intersection(&self, other: Self) -> Self {
+        match (*self, other) {
+            (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
+            (Interval::Range(a, b), Interval::Range(c, d)) => {
+                match (cmp::max(a, c), cmp::min(b, d)) {
+                    (min, max) if min <= max => Interval::Range(min, max),
+                    _ => Interval::Bottom,
+                }
+            }
+        }
+    }
+
+    pub fn widen(&self, other: Self) -> Self {
+        match (*self, other) {
+            (a, Interval::Bottom) => a,
+            (Interval::Bottom, b) => b,
+            (Interval::Range(a, b), Interval::Range(c, d)) => {
+                let min = if a <= c { a } else { Integer::NegInf };
+                let max = if b >= d { b } else { Integer::PosInf };
+                Interval::Range(min, max)
+            }
+        }
+    }
+
+    pub fn narrow(&self, other: Self) -> Self {
+        match (*self, other) {
+            (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
+            (Interval::Range(a, b), Interval::Range(c, d)) => {
+                let min = if a == Integer::NegInf { c } else { a };
+                let max = if b == Integer::PosInf { d } else { b };
+                Interval::Range(min, max)
+            }
         }
     }
 }
 
-pub trait IntervalOperations {
-    fn shift(&self, val: Integer) -> Self;
-
-    fn contains(&self, other: Self) -> bool;
-    fn on_left(&self, other: Self) -> bool;
-    fn on_right(&self, other: Self) -> bool;
-    fn overlaps(&self, other: Self) -> bool;
-    fn difference(&self, other: Self) -> Self;
-
-    fn clamp_min(&self, other: Self) -> Self;
-    fn clamp_max(&self, other: Self) -> Self;
-}
+// --- operators
 
 impl ops::Neg for Interval {
     type Output = Self;
@@ -117,7 +162,6 @@ impl ops::Div<Interval> for Interval {
     }
 }
 
-// inclusion ordering
 impl PartialOrd for Interval {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (*self, *other) {
@@ -134,123 +178,19 @@ impl PartialOrd for Interval {
 impl PartialEq for Interval {
     fn eq(&self, other: &Self) -> bool {
         match (*self, *other) {
-            (Interval::Range(a, b), Interval::Range(c, d)) => a == b && c == d,
             (Interval::Bottom, Interval::Bottom) => true,
-            _ => false,
+            (Interval::Bottom, _) | (_, Interval::Bottom) => false,
+            (Interval::Range(a, b), Interval::Range(c, d)) => a == c && b == d,
         }
     }
 }
 
-impl IntervalOperations for Interval {
-    fn shift(&self, val: Integer) -> Self {
-        match *self {
-            Interval::Bottom => Interval::Bottom,
-            Interval::Range(min, max) => Interval::Range(min + val, max + val),
-        }
-    }
-
-    fn contains(&self, other: Self) -> bool {
-        match (*self, other) {
-            (Interval::Bottom, _) => false,
-            (_, Interval::Bottom) => true,
-            (Interval::Range(a, b), Interval::Range(c, d)) => a <= c && b >= d,
-        }
-    }
-
-    fn on_left(&self, other: Self) -> bool {
-        match (*self, other) {
-            (Interval::Bottom, _) | (_, Interval::Bottom) => false,
-            (Interval::Range(_, b), Interval::Range(c, _)) => b <= c,
-        }
-    }
-
-    fn on_right(&self, other: Self) -> bool {
-        match (*self, other) {
-            (Interval::Bottom, _) | (_, Interval::Bottom) => false,
-            (Interval::Range(a, _), Interval::Range(_, d)) => a >= d,
-        }
-    }
-
-    fn overlaps(&self, other: Self) -> bool {
-        self.intersection(other) != Interval::Bottom
-    }
-
-    fn difference(&self, other: Self) -> Self {
-        match (*self, other) {
-            (Interval::Bottom, _) => Interval::Bottom,
-            (a, Interval::Bottom) => a,
-            (Interval::Range(a, b), Interval::Range(c, d)) if c <= a && d >= b => Interval::Bottom,
-            (Interval::Range(a, b), Interval::Range(c, d)) if c >= a && d <= b => self.clone(),
-            (Interval::Range(a, b), Interval::Range(c, d)) if c <= a && d <= b => {
-                Interval::Range(d + 1, b)
-            }
-            (Interval::Range(a, b), Interval::Range(c, d)) if c >= a && d >= b => {
-                Interval::Range(a, c - 1)
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    fn clamp_min(&self, other: Self) -> Self {
-        match (*self, other) {
-            (Interval::Bottom, _) => Interval::Bottom,
-            (_, Interval::Bottom) => self.clone(),
-            (Interval::Range(a, b), Interval::Range(c, _)) => Interval::Range(cmp::min(a, c), b),
-        }
-    }
-
-    fn clamp_max(&self, other: Self) -> Self {
-        match (*self, other) {
-            (Interval::Bottom, _) => Interval::Bottom,
-            (_, Interval::Bottom) => self.clone(),
-            (Interval::Range(a, b), Interval::Range(_, d)) => Interval::Range(a, cmp::max(b, d)),
-        }
-    }
-}
-
-impl Lattice for Interval {
-    fn union(&self, other: Self) -> Self {
-        match (*self, other) {
-            (a, Interval::Bottom) => a,
-            (Interval::Bottom, b) => b,
-            (Interval::Range(a, b), Interval::Range(c, d)) => {
-                Interval::Range(cmp::min(a, c), cmp::max(b, d))
-            }
-        }
-    }
-
-    fn intersection(&self, other: Self) -> Self {
-        match (*self, other) {
-            (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
-            (Interval::Range(a, b), Interval::Range(c, d)) => {
-                match (cmp::max(a, c), cmp::min(b, d)) {
-                    (min, max) if min <= max => Interval::Range(min, max),
-                    _ => Interval::Bottom,
-                }
-            }
-        }
-    }
-
-    fn widen(&self, other: Self) -> Self {
-        match (*self, other) {
-            (a, Interval::Bottom) => a,
-            (Interval::Bottom, b) => b,
-            (Interval::Range(a, b), Interval::Range(c, d)) => {
-                let min = if a <= c { a } else { Integer::NegInf };
-                let max = if b >= d { b } else { Integer::PosInf };
-                Interval::Range(min, max)
-            }
-        }
-    }
-
-    fn narrow(&self, other: Self) -> Self {
-        match (*self, other) {
-            (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
-            (Interval::Range(a, b), Interval::Range(c, d)) => {
-                let min = if a == Integer::NegInf { c } else { a };
-                let max = if b == Integer::PosInf { d } else { b };
-                Interval::Range(min, max)
-            }
+impl fmt::Display for Interval {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Interval::Bottom => write!(f, "Empty interval"),
+            // Interval::Range(a, b) if a == b => write!(f, "{}", a),
+            Interval::Range(a, b) => write!(f, "[{}, {}]", a, b),
         }
     }
 }
