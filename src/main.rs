@@ -1,15 +1,22 @@
 use std::fs;
 
-use crate::{integer::Integer, interval::Interval};
+use crate::{
+    abstract_state::State,
+    integer::Integer,
+    interval::Interval,
+    invariant::{Invariant, InvariantOperations},
+};
 
-mod abstract_semantics;
 mod abstract_state;
 mod ast;
 mod cli;
 mod concrete_semantics;
 mod concrete_state;
+mod domain;
 mod integer;
 mod interval;
+mod invariant;
+mod lattice;
 
 fn interval_from_bounds(min: Option<i32>, max: Option<i32>) -> interval::Interval {
     match (min, max) {
@@ -26,19 +33,17 @@ fn main() {
     let ast = ast::parse(&source).expect("[ERROR] failed to parse the program");
     let bounds = interval_from_bounds(opts.min_interval, opts.max_interval);
 
-    let astate = (
-        abstract_state::empty_state(),
-        abstract_state::default_invariant(),
-    );
+    let astate = State::<Interval>::new();
+    let inv = Invariant::<Interval>::new();
 
     println!("[INFO] Evaluating the abstract semantics");
-    let (a_state, a_inv) = abstract_semantics::eval_stmt(ast.clone(), astate);
+    let (a_state, a_inv) = State::eval_stmt(ast.clone(), (astate, inv), bounds);
 
     println!("[INFO] ABSTRACT STATE");
     a_state.pretty_print();
 
     println!("[INFO] PROGRAM POINTS");
-    abstract_state::pretty_print_inv(&a_inv);
+    a_inv.pretty_print();
 
     println!("[INFO] Building the concrete semantics");
     let c_semantics = concrete_semantics::denote_stmt(ast);

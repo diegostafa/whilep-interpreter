@@ -1,15 +1,138 @@
-use std::{
-    cmp::{self, Ordering},
-    fmt,
-    ops::{self},
-};
+use std::{cmp, fmt, ops};
 
-use crate::integer::*;
+use crate::{abstract_state::*, ast::*, domain::*, integer::*, lattice::*};
 
 #[derive(Debug, Clone, Copy, Eq)]
 pub enum Interval {
     Bottom,
     Range(Integer, Integer),
+}
+
+impl Lattice for Interval {
+    const TOP: Self = Interval::Range(Integer::NegInf, Integer::PosInf);
+    const BOT: Self = Interval::Bottom;
+
+    fn union(&self, other: Self) -> Self {
+        match (*self, other) {
+            (a, Interval::Bottom) => a,
+            (Interval::Bottom, b) => b,
+            (Interval::Range(a, b), Interval::Range(c, d)) => {
+                Interval::Range(cmp::min(a, c), cmp::max(b, d))
+            }
+        }
+    }
+
+    fn intersection(&self, other: Self) -> Self {
+        match (*self, other) {
+            (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
+            (Interval::Range(a, b), Interval::Range(c, d)) => {
+                match (cmp::max(a, c), cmp::min(b, d)) {
+                    (min, max) if min <= max => Interval::Range(min, max),
+                    _ => Interval::Bottom,
+                }
+            }
+        }
+    }
+
+    fn widen(&self, other: Self) -> Self {
+        match (*self, other) {
+            (a, Interval::Bottom) => a,
+            (Interval::Bottom, b) => b,
+            (Interval::Range(a, b), Interval::Range(c, d)) => {
+                let min = if a <= c { a } else { Integer::NegInf };
+                let max = if b >= d { b } else { Integer::PosInf };
+                Interval::Range(min, max)
+            }
+        }
+    }
+
+    fn narrow(&self, other: Self) -> Self {
+        match (*self, other) {
+            (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
+            (Interval::Range(a, b), Interval::Range(c, d)) => {
+                let min = if a == Integer::NegInf { c } else { a };
+                let max = if b == Integer::PosInf { d } else { b };
+                Interval::Range(min, max)
+            }
+        }
+    }
+}
+
+impl Domain for Interval {
+    fn eval_aexpr(expr: &ArithmeticExpr, state: &State<Interval>) -> (Interval, State<Interval>) {
+        match expr {
+            ArithmeticExpr::Number(n) => (Interval::Range(*n, *n), state.clone()),
+            ArithmeticExpr::Interval(n, m) => (Interval::Range(*n, *m), state.clone()),
+            ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
+            ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
+            ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
+            ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
+            ArithmeticExpr::Div(a1, a2) => binop_aexpr(|a, b| a / b, a1, a2, state),
+            ArithmeticExpr::PostIncrement(var) => {
+                let interval = state.read(var);
+                (interval, state.put(var, interval.shift(Integer::Value(1))))
+            }
+            ArithmeticExpr::PostDecrement(var) => {
+                let interval = state.read(var);
+                (interval, state.put(var, interval.shift(Integer::Value(-1))))
+            }
+        }
+    }
+
+    fn eval_bexpr(expr: &BooleanExpr, state: &State<Interval>) -> State<Interval> {
+        match expr {
+            BooleanExpr::True => state.clone(),
+            BooleanExpr::False => State::Bottom,
+            BooleanExpr::Not(b) => Self::eval_bexpr(&desugar_not_bexpr(*b.clone()), state),
+            BooleanExpr::And(b1, b2) => {
+                Self::eval_bexpr(b1, state).intersection(Self::eval_bexpr(b2, state))
+            }
+            BooleanExpr::Or(b1, b2) => {
+                Self::eval_bexpr(b1, state).union(Self::eval_bexpr(b2, state))
+            }
+            BooleanExpr::NumEq(a1, a2) => {
+                let (i1, i2, new_state) = trans_aexpr(a1, a2, &state);
+                match i1.intersection(i2) {
+                    Interval::Bottom => State::Bottom,
+                    intersection => new_state
+                        .try_put(a1, intersection)
+                        .try_put(a2, intersection),
+                }
+            }
+            BooleanExpr::NumNotEq(a1, a2) => {
+                let (_, _, new_state) = trans_aexpr(a1, a2, &state);
+                new_state
+            }
+
+            BooleanExpr::NumLt(a1, a2) => {
+                let (i1, i2, new_state) = trans_aexpr(a1, a2, &state);
+                let one = Integer::Value(1);
+                let lhs = i1.intersection(i2.add_min(Integer::NegInf).add_max(-one));
+                let rhs = i2.intersection(i1.add_max(Integer::PosInf).add_min(one));
+                match (lhs, rhs) {
+                    (Interval::Bottom, _) | (_, Interval::Bottom) => State::Bottom,
+                    _ => new_state.try_put(a1, lhs).try_put(a2, rhs),
+                }
+            }
+
+            BooleanExpr::NumLtEq(a1, a2) => {
+                let (i1, i2, new_state) = trans_aexpr(a1, a2, &state);
+                let lhs = i1.intersection(i2.add_min(Integer::NegInf));
+                let rhs = i2.intersection(i1.add_max(Integer::PosInf));
+                match (lhs, rhs) {
+                    (Interval::Bottom, _) | (_, Interval::Bottom) => State::Bottom,
+                    _ => new_state.try_put(a1, lhs).try_put(a2, rhs),
+                }
+            }
+
+            BooleanExpr::NumGt(a1, a2) => {
+                Self::eval_bexpr(&BooleanExpr::NumLt(a2.clone(), a1.clone()), state)
+            }
+            BooleanExpr::NumGtEq(a1, a2) => {
+                Self::eval_bexpr(&BooleanExpr::NumLtEq(a2.clone(), a1.clone()), state)
+            }
+        }
+    }
 }
 
 impl Interval {
@@ -30,54 +153,29 @@ impl Interval {
             Interval::Range(min, max) => Interval::Range(min, max + val),
         }
     }
+}
 
-    pub fn union(&self, other: Self) -> Self {
-        match (*self, other) {
-            (a, Interval::Bottom) => a,
-            (Interval::Bottom, b) => b,
-            (Interval::Range(a, b), Interval::Range(c, d)) => {
-                Interval::Range(cmp::min(a, c), cmp::max(b, d))
-            }
-        }
-    }
+// --- traits/operators
 
-    pub fn intersection(&self, other: Self) -> Self {
-        match (*self, other) {
-            (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
-            (Interval::Range(a, b), Interval::Range(c, d)) => {
-                match (cmp::max(a, c), cmp::min(b, d)) {
-                    (min, max) if min <= max => Interval::Range(min, max),
-                    _ => Interval::Bottom,
-                }
-            }
-        }
-    }
-
-    pub fn widen(&self, other: Self) -> Self {
-        match (*self, other) {
-            (a, Interval::Bottom) => a,
-            (Interval::Bottom, b) => b,
-            (Interval::Range(a, b), Interval::Range(c, d)) => {
-                let min = if a <= c { a } else { Integer::NegInf };
-                let max = if b >= d { b } else { Integer::PosInf };
-                Interval::Range(min, max)
-            }
-        }
-    }
-
-    pub fn narrow(&self, other: Self) -> Self {
-        match (*self, other) {
-            (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
-            (Interval::Range(a, b), Interval::Range(c, d)) => {
-                let min = if a == Integer::NegInf { c } else { a };
-                let max = if b == Integer::PosInf { d } else { b };
-                Interval::Range(min, max)
-            }
+impl PartialEq for Interval {
+    fn eq(&self, other: &Self) -> bool {
+        match (*self, *other) {
+            (Interval::Bottom, Interval::Bottom) => true,
+            (Interval::Bottom, _) | (_, Interval::Bottom) => false,
+            (Interval::Range(a, b), Interval::Range(c, d)) => a == c && b == d,
         }
     }
 }
 
-// --- operators
+impl fmt::Display for Interval {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Interval::Bottom => write!(f, "Empty interval"),
+            // Interval::Range(a, b) if a == b => write!(f, "{}", a),
+            Interval::Range(a, b) => write!(f, "[{}, {}]", a, b),
+        }
+    }
+}
 
 impl ops::Neg for Interval {
     type Output = Self;
@@ -158,39 +256,6 @@ impl ops::Div<Interval> for Interval {
                 }
             }
             _ => Interval::Bottom,
-        }
-    }
-}
-
-impl PartialOrd for Interval {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (*self, *other) {
-            (Interval::Bottom, _) => Some(Ordering::Less),
-            (_, Interval::Bottom) => None,
-            (Interval::Range(a, b), Interval::Range(c, d)) => match a >= c && b <= d {
-                true => Some(Ordering::Less),
-                _ => None,
-            },
-        }
-    }
-}
-
-impl PartialEq for Interval {
-    fn eq(&self, other: &Self) -> bool {
-        match (*self, *other) {
-            (Interval::Bottom, Interval::Bottom) => true,
-            (Interval::Bottom, _) | (_, Interval::Bottom) => false,
-            (Interval::Range(a, b), Interval::Range(c, d)) => a == c && b == d,
-        }
-    }
-}
-
-impl fmt::Display for Interval {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Interval::Bottom => write!(f, "Empty interval"),
-            // Interval::Range(a, b) if a == b => write!(f, "{}", a),
-            Interval::Range(a, b) => write!(f, "[{}, {}]", a, b),
         }
     }
 }
