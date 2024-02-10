@@ -1,33 +1,33 @@
-use crate::ast::*;
-use crate::concrete_state::*;
-use crate::integer::*;
+use crate::concrete_semantics::state::*;
+use crate::parser::ast::*;
+use crate::types::integer::*;
 
 // --- type aliases
 
-type StateFunction = Box<dyn Fn(State) -> State>;
+type StateFunction = Box<dyn Fn(State) -> Option<State>>;
 type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
 
 // --- semantic functions
 
 fn bottom() -> StateFunction {
-    Box::new(|_| State::Bottom)
+    Box::new(|_| None)
 }
 
 fn id() -> StateFunction {
-    Box::new(|state| state)
+    Box::new(|state| Some(state))
 }
 
 fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
     Box::new(move |state| match f(state.clone()) {
-        State::Bottom => state,
-        _ => g(state),
+        Some(new_state) => g(new_state),
+        None => None,
     })
 }
 
 fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
     Box::new(move |state| {
         let (val, new_state) = eval_aexpr(&val, &state);
-        new_state.put(&var, val)
+        Some(new_state.put(&var, val))
     })
 }
 
@@ -44,9 +44,8 @@ fn fix(f: Functional) -> StateFunction {
         loop {
             g = f(g);
             let final_state = g(state.clone());
-            match final_state {
-                State::Bottom => continue,
-                _ => break final_state,
+            if final_state.is_some() {
+                return final_state;
             }
         }
     })
@@ -112,9 +111,9 @@ fn trans_aexpr(
     a2: &ArithmeticExpr,
     state: &State,
 ) -> (Integer, Integer, State) {
-    let (i1, new_state) = eval_aexpr(a1, &state);
-    let (i2, new_state) = eval_aexpr(a2, &new_state);
-    (i1, i2, new_state)
+    let (a1_interval, new_state) = eval_aexpr(a1, &state);
+    let (a2_interval, new_state) = eval_aexpr(a2, &new_state);
+    (a1_interval, a2_interval, new_state)
 }
 
 fn binop_aexpr(

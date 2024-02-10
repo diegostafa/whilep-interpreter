@@ -1,8 +1,7 @@
-use std::fmt::Display;
+use crate::abstract_semantics::state::*;
+use crate::domain::domain::*;
 
-use crate::{abstract_state::*, domain::*, lattice::*};
-
-pub type Invariant<T: Domain> = Vec<State<T>>;
+pub type Invariant<T> = Vec<State<T>>;
 
 pub trait InvariantOperations: Sized {
     fn new() -> Self;
@@ -10,7 +9,7 @@ pub trait InvariantOperations: Sized {
     fn pretty_print(&self);
 }
 
-impl<T: Domain + Lattice + Display + Clone + Eq> InvariantOperations for Invariant<T> {
+impl<T: Domain> InvariantOperations for Invariant<T> {
     fn new() -> Self {
         vec![]
     }

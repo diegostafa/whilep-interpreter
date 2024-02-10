@@ -1,15 +1,20 @@
 use std::fmt::Display;
+use trait_set::trait_set;
 
-use crate::abstract_state::*;
-use crate::ast::*;
-use crate::lattice::Lattice;
+use crate::abstract_semantics::state::*;
+use crate::domain::lattice::*;
+use crate::parser::ast::*;
 
-pub trait Domain: Sized + Lattice + Display + Clone + Eq {
+trait_set! {
+    pub trait DomainProperties = Sized + Lattice + Display + Clone + Eq;
+}
+
+pub trait Domain: DomainProperties {
     fn eval_aexpr(expr: &ArithmeticExpr, state: &State<Self>) -> (Self, State<Self>);
     fn eval_bexpr(expr: &BooleanExpr, state: &State<Self>) -> State<Self>;
 }
 
-pub fn trans_aexpr<T: Domain + Lattice + Display + Clone>(
+pub fn trans_aexpr<T: Domain>(
     a1: &ArithmeticExpr,
     a2: &ArithmeticExpr,
     state: &State<T>,
@@ -19,7 +24,7 @@ pub fn trans_aexpr<T: Domain + Lattice + Display + Clone>(
     (i1, i2, new_state)
 }
 
-pub fn binop_aexpr<T: Domain + Lattice + Display + Clone>(
+pub fn binop_aexpr<T: Domain>(
     op: fn(T, T) -> T,
     a1: &ArithmeticExpr,
     a2: &ArithmeticExpr,

@@ -1,6 +1,6 @@
 use lalrpop_util::{lalrpop_mod, lexer::Token, ParseError};
 
-use crate::integer::Integer;
+use crate::types::integer::*;
 
 lalrpop_mod!(pub whilep);
 

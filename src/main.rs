@@ -1,24 +1,19 @@
 use std::fs;
 
-use crate::{
-    abstract_state::State,
-    integer::Integer,
-    interval::Interval,
-    invariant::{Invariant, InvariantOperations},
-};
+use crate::abstract_semantics::invariant::*;
+use crate::concrete_semantics::state::*;
+use crate::domain::interval::*;
+use crate::parser::ast;
+use crate::types::integer::*;
 
-mod abstract_state;
-mod ast;
+mod abstract_semantics;
 mod cli;
 mod concrete_semantics;
-mod concrete_state;
 mod domain;
-mod integer;
-mod interval;
-mod invariant;
-mod lattice;
+mod parser;
+mod types;
 
-fn interval_from_bounds(min: Option<i32>, max: Option<i32>) -> interval::Interval {
+fn interval_from_bounds(min: Option<i32>, max: Option<i32>) -> Interval {
     match (min, max) {
         (Some(m), Some(n)) => Interval::Range(Integer::Value(m), Integer::Value(n)),
         (Some(m), None) => Interval::Range(Integer::Value(m), Integer::PosInf),
@@ -33,24 +28,22 @@ fn main() {
     let ast = ast::parse(&source).expect("[ERROR] failed to parse the program");
     let bounds = interval_from_bounds(opts.min_interval, opts.max_interval);
 
-    let astate = State::<Interval>::new();
-    let inv = Invariant::<Interval>::new();
-
     println!("[INFO] Evaluating the abstract semantics");
-    let (a_state, a_inv) = State::eval_stmt(ast.clone(), (astate, inv), bounds);
+    let (astate, inv) = abstract_semantics::state::State::<Interval>::new()
+        .eval_stmt(&ast, &Invariant::<Interval>::new());
 
     println!("[INFO] ABSTRACT STATE");
-    a_state.pretty_print();
+    astate.pretty_print();
 
     println!("[INFO] PROGRAM POINTS");
-    a_inv.pretty_print();
+    inv.pretty_print();
 
     println!("[INFO] Building the concrete semantics");
-    let c_semantics = concrete_semantics::denote_stmt(ast);
+    let induced_function = concrete_semantics::denote::denote_stmt(ast);
 
     println!("[INFO] Evaluating the concrete semantics");
-    let c_state = c_semantics(concrete_state::empty_state());
+    let c_state = induced_function(concrete_semantics::state::State::new());
 
     println!("[INFO] CONCRETE STATE");
-    c_state.pretty_print();
+    c_state.unwrap().pretty_print();
 }
