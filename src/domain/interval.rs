@@ -190,6 +190,7 @@ impl fmt::Display for Interval {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Interval::Empty => write!(f, "Empty interval"),
+            Interval::Range(a, b) if a == b => write!(f, "[{}]", a),
             Interval::Range(a, b) => write!(f, "[{}, {}]", a, b),
         }
     }

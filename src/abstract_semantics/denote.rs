@@ -14,8 +14,8 @@ pub type StateTransformer<'a, T> =
 
 // --- ast denotation
 
-pub fn denote_stmt<'a, T: Domain + 'a>(ast: Statement) -> StateFunction<'a, T> {
-    match ast {
+pub fn denote_stmt<'a, T: Domain + 'a>(stmt: Statement) -> StateFunction<'a, T> {
+    match stmt {
         Statement::Skip => id(),
         Statement::Chain(s1, s2) => compose(denote_stmt(*s1), denote_stmt(*s2)),
         Statement::Assignment { var, val } => state_update(var, *val),
@@ -27,7 +27,7 @@ pub fn denote_stmt<'a, T: Domain + 'a>(ast: Statement) -> StateFunction<'a, T> {
 // --- semantic functions
 
 fn id<'a, T: Domain + 'a>() -> StateFunction<'a, T> {
-    Box::new(|(state, inv)| (state, inv))
+    Box::new(|(state, inv)| (state.clone(), inv.append(state)))
 }
 
 fn compose<'a, T: Domain + 'a>(
@@ -41,7 +41,7 @@ fn state_update<'a, T: Domain + 'a>(var: String, val: ArithmeticExpr) -> StateFu
     Box::new(move |(state, inv)| {
         let (interval, new_state) = T::eval_aexpr(&val, &state);
         let new_state = new_state.put(&var, interval);
-        (new_state.clone(), inv.append(&[vec![new_state]]))
+        (new_state.clone(), inv.append(new_state))
     })
 }
 
@@ -54,20 +54,13 @@ fn conditional<'a, T: Domain + 'a>(
         let tt_state = T::eval_bexpr(&cond, &state);
         let ff_state = T::eval_bexpr(&negate_bexpr(&cond), &state);
 
-        let (s1_state, s1_inv) = match tt_state {
-            State::Just(_) => s1((tt_state.clone(), Invariant::new())),
-            _ => (State::Bottom, Invariant::new()),
-        };
-
-        let (s2_state, s2_inv) = match ff_state {
-            State::Just(_) => s2((ff_state.clone(), Invariant::new())),
-            _ => (State::Bottom, Invariant::new()),
-        };
+        let (s1_state, s1_inv) = s1((tt_state.clone(), Invariant::new()));
+        let (s2_state, s2_inv) = s2((ff_state.clone(), Invariant::new()));
 
         let end_state = s1_state.union(&s2_state);
         (
             end_state.clone(),
-            inv.append(&[
+            inv.concat(&[
                 vec![tt_state],
                 s1_inv,
                 vec![ff_state],
@@ -80,9 +73,9 @@ fn conditional<'a, T: Domain + 'a>(
 
 fn lfp<'a, T: Domain + 'a>(cond: BooleanExpr, body: StateFunction<'a, T>) -> StateFunction<'a, T> {
     Box::new(move |(state, inv)| {
-        let f = Box::new(|t: &State<T>, inv: Invariant<T>| {
-            let cond_state = T::eval_bexpr(&cond, &t);
-            let (body_state, body_inv) = body((cond_state.clone(), inv));
+        let f = Box::new(|s: &State<T>, i: Invariant<T>| {
+            let cond_state = T::eval_bexpr(&cond, &s);
+            let (body_state, body_inv) = body((cond_state.clone(), i));
             (state.widen(&body_state), vec![cond_state], body_inv)
         });
 
@@ -98,11 +91,11 @@ fn lfp<'a, T: Domain + 'a>(cond: BooleanExpr, body: StateFunction<'a, T>) -> Sta
         };
 
         let (post_state, cond_inv, post_inv) = fix(f);
-        let narrowed_state = post_state.narrow(post_inv.last().unwrap());
+        let narrowed_state = post_state.narrow(&post_inv.back());
         let end_state = T::eval_bexpr(&negate_bexpr(&cond), &narrowed_state);
         (
-            narrowed_state,
-            inv.append(&[cond_inv, post_inv, vec![end_state]]),
+            end_state.clone(),
+            inv.concat(&[cond_inv, post_inv, vec![end_state]]),
         )
     })
 }

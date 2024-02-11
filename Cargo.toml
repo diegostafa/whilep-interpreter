@@ -11,3 +11,4 @@ clap = { version = "4.4.12", features = ["derive"] }
 lalrpop-util = { version = "0.20.0", features = ["lexer", "regex", "unicode"] }
 rand = "0.8.5"
 trait-set = "0.3.0"
+cli-tables = "0.1.0"

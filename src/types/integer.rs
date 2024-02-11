@@ -71,7 +71,7 @@ impl ops::Add<Integer> for Integer {
             | (Integer::NegInf, Integer::Value(_))
             | (Integer::Value(_), Integer::NegInf) => Integer::NegInf,
 
-            _ => panic!("[ERROR] PosInf + NegInf"),
+            _ => panic!("[ERROR] undefined operation: PosInf + NegInf"),
         }
     }
 }

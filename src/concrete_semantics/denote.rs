@@ -9,8 +9,8 @@ type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
 
 // --- ast denotation
 
-pub fn denote_stmt(ast: Statement) -> StateFunction {
-    match ast {
+pub fn denote_stmt(stmt: Statement) -> StateFunction {
+    match stmt {
         Statement::Skip => id(),
         Statement::Chain(s1, s2) => compose(denote_stmt(*s1), denote_stmt(*s2)),
         Statement::Assignment { var, val } => state_update(var, *val),

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use lalrpop_util::{lalrpop_mod, lexer::Token, ParseError};
 
 use crate::types::integer::*;
@@ -79,4 +81,50 @@ pub fn desugar_not_bexpr(expr: BooleanExpr) -> BooleanExpr {
 
 pub fn negate_bexpr(expr: &BooleanExpr) -> BooleanExpr {
     BooleanExpr::Not(Box::new(expr.clone()))
+}
+
+impl fmt::Display for Statement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Statement::Skip => write!(f, "skip"),
+            Statement::Assignment { var, val } => write!(f, "{} := {}", var, val),
+            Statement::If { cond, s1, s2 } => write!(f, "if {} then {} else {}", cond, s1, s2),
+            Statement::While { cond, body } => write!(f, "while {} do {}", cond, body),
+            Statement::Chain(s1, s2) => write!(f, "{}; {}", s1, s2),
+        }
+    }
+}
+
+impl fmt::Display for ArithmeticExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ArithmeticExpr::Number(n) => write!(f, "{}", n),
+            ArithmeticExpr::Interval(a, b) => write!(f, "[{}, {}]", a, b),
+            ArithmeticExpr::Identifier(s) => write!(f, "{}", s),
+            ArithmeticExpr::PostIncrement(s) => write!(f, "{}++", s),
+            ArithmeticExpr::PostDecrement(s) => write!(f, "{}--", s),
+            ArithmeticExpr::Add(a, b) => write!(f, "({} + {})", a, b),
+            ArithmeticExpr::Sub(a, b) => write!(f, "({} - {})", a, b),
+            ArithmeticExpr::Mul(a, b) => write!(f, "({} * {})", a, b),
+            ArithmeticExpr::Div(a, b) => write!(f, "({} / {})", a, b),
+        }
+    }
+}
+
+impl fmt::Display for BooleanExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BooleanExpr::True => write!(f, "true"),
+            BooleanExpr::False => write!(f, "false"),
+            BooleanExpr::Not(b) => write!(f, "!{}", b),
+            BooleanExpr::And(b1, b2) => write!(f, "({} && {})", b1, b2),
+            BooleanExpr::Or(b1, b2) => write!(f, "({} || {})", b1, b2),
+            BooleanExpr::NumEq(a1, a2) => write!(f, "({} == {})", a1, a2),
+            BooleanExpr::NumNotEq(a1, a2) => write!(f, "({} != {})", a1, a2),
+            BooleanExpr::NumLt(a1, a2) => write!(f, "({} < {})", a1, a2),
+            BooleanExpr::NumGt(a1, a2) => write!(f, "({} > {})", a1, a2),
+            BooleanExpr::NumLtEq(a1, a2) => write!(f, "({} <= {})", a1, a2),
+            BooleanExpr::NumGtEq(a1, a2) => write!(f, "({} >= {})", a1, a2),
+        }
+    }
 }

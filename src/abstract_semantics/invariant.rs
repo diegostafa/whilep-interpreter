@@ -3,18 +3,26 @@ use crate::domain::domain::*;
 
 pub type Invariant<T> = Vec<State<T>>;
 
-pub trait InvariantOperations: Sized {
+pub trait InvariantOperations<T: Domain>: Sized {
     fn new() -> Self;
-    fn append(&self, others: &[Self]) -> Self;
-    fn pretty_print(&self);
+    fn back(&self) -> State<T>;
+    fn concat(&self, others: &[Self]) -> Self;
+    fn append(&self, state: State<T>) -> Self;
 }
 
-impl<T: Domain> InvariantOperations for Invariant<T> {
+impl<T: Domain> InvariantOperations<T> for Invariant<T> {
     fn new() -> Self {
         vec![]
     }
 
-    fn append(&self, others: &[Self]) -> Self {
+    fn back(&self) -> State<T> {
+        match self.last() {
+            Some(state) => state.clone(),
+            None => State::new(),
+        }
+    }
+
+    fn concat(&self, others: &[Self]) -> Self {
         let mut final_inv = self.clone();
         for inv in others {
             final_inv.extend(inv.clone());
@@ -22,10 +30,9 @@ impl<T: Domain> InvariantOperations for Invariant<T> {
         final_inv
     }
 
-    fn pretty_print(&self) {
-        for (i, state) in self.iter().enumerate() {
-            print!("{}: ", i);
-            state.pretty_print();
-        }
+    fn append(&self, state: State<T>) -> Self {
+        let mut new = self.clone();
+        new.push(state);
+        new
     }
 }

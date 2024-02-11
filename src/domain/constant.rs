@@ -46,13 +46,19 @@ impl Domain for Constant {
         match expr {
             ArithmeticExpr::Number(c) => (Constant::Value(*c), state.clone()),
             ArithmeticExpr::Interval(_, _) => (Constant::Any, state.clone()),
-            ArithmeticExpr::Identifier(_) => todo!(),
+            ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
             ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
             ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
             ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
             ArithmeticExpr::Div(a1, a2) => binop_aexpr(|a, b| a / b, a1, a2, state),
-            ArithmeticExpr::PostIncrement(_) => todo!(),
-            ArithmeticExpr::PostDecrement(_) => todo!(),
+            ArithmeticExpr::PostIncrement(var) => {
+                let val = state.read(var);
+                (val, state.put(var, Constant::Any))
+            }
+            ArithmeticExpr::PostDecrement(var) => {
+                let val = state.read(var);
+                (val, state.put(var, Constant::Any))
+            }
         }
     }
 
@@ -82,7 +88,7 @@ impl fmt::Display for Constant {
         match self {
             Constant::None => write!(f, "Bottom constant"),
             Constant::Value(c) => write!(f, "{}", c),
-            Constant::Any => write!(f, "Any constant"),
+            Constant::Any => write!(f, "Any"),
         }
     }
 }

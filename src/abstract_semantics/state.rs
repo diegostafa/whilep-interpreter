@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use crate::domain::domain::*;
 use crate::domain::lattice::*;
@@ -17,24 +18,22 @@ impl<T: Domain> State<T> {
 
     pub fn read(&self, var: &String) -> T {
         match self {
+            State::Bottom => T::BOT,
             State::Just(state) => match state.get(var) {
                 Some(val) => val.clone(),
                 None => T::TOP,
             },
-            State::Bottom => panic!("[ERROR] bottom state"),
         }
     }
 
     pub fn put(&self, var: &String, val: T) -> Self {
         match self.clone() {
-            State::Just(mut s) => match val == T::BOT {
-                true => State::Bottom,
-                _ => {
-                    s.insert(var.to_string(), val);
-                    State::Just(s)
-                }
-            },
-            State::Bottom => panic!("[ERROR] bottom state"),
+            State::Bottom => State::Bottom,
+            _ if val == T::BOT => State::Bottom,
+            State::Just(mut s) => {
+                s.insert(var.to_string(), val);
+                State::Just(s)
+            }
         }
     }
 
@@ -46,21 +45,6 @@ impl<T: Domain> State<T> {
             }
             (State::Just(_), _) => self.clone(),
             _ => State::Bottom,
-        }
-    }
-
-    pub fn pretty_print(&self) {
-        match self {
-            State::Just(s) => {
-                let mut pretty_state = s
-                    .iter()
-                    .map(|(var, val)| format!("{}: {}", var, val))
-                    .collect::<Vec<String>>();
-
-                pretty_state.sort();
-                println!("\t{}", pretty_state.join(", "))
-            }
-            State::Bottom => println!("\tBOTTOM STATE"),
         }
     }
 }
@@ -104,6 +88,24 @@ impl<T: Domain> PartialEq for State<T> {
                     }
                 }
                 return true;
+            }
+        }
+    }
+}
+
+impl<T: Domain> fmt::Display for State<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            State::Bottom => write!(f, "BOTTOM STATE"),
+            State::Just(s) if s.is_empty() => write!(f, "EMPTY STATE"),
+            State::Just(s) => {
+                let mut pretty_state = s
+                    .iter()
+                    .map(|(var, val)| format!("{}: {}", var, val))
+                    .collect::<Vec<String>>();
+
+                pretty_state.sort();
+                write!(f, "{}", pretty_state.join(", "))
             }
         }
     }
