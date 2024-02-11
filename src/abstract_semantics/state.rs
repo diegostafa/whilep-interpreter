@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::abstract_semantics::invariant::*;
 use crate::domain::domain::*;
 use crate::domain::lattice::*;
 use crate::parser::ast::*;
@@ -12,69 +11,6 @@ pub enum State<T: Domain> {
 }
 
 impl<T: Domain> State<T> {
-    pub fn eval_stmt(&self, ast: &Statement, inv: &Invariant<T>) -> (State<T>, Invariant<T>) {
-        let state = self.clone();
-        match state {
-            State::Bottom => (state.clone(), inv.clone()),
-            _ => match ast {
-                Statement::Skip => (state.clone(), inv.append(&[vec![state.clone()]])),
-
-                Statement::Chain(s1, s2) => {
-                    let (new_state, new_inv) = state.eval_stmt(s1, inv);
-                    new_state.eval_stmt(s2, &new_inv)
-                }
-
-                Statement::Assignment { var, val } => {
-                    let (interval, new_state) = T::eval_aexpr(&val, &state);
-                    let new_state = new_state.put(&var, interval);
-                    (new_state.clone(), inv.append(&[vec![new_state]]))
-                }
-
-                Statement::If { cond, s1, s2 } => {
-                    let tt_state = T::eval_bexpr(&cond, &state);
-                    let ff_state = T::eval_bexpr(&negate_bexpr(&cond), &state);
-                    let (s1_state, s1_inv) = tt_state.eval_stmt(s1, &Invariant::new());
-                    let (s2_state, s2_inv) = ff_state.eval_stmt(s2, &Invariant::new());
-
-                    let endif_state = s1_state.union(&s2_state);
-                    (
-                        endif_state.clone(),
-                        inv.append(&[
-                            vec![tt_state],
-                            s1_inv,
-                            vec![ff_state],
-                            s2_inv,
-                            vec![endif_state],
-                        ]),
-                    )
-                }
-
-                Statement::While { cond, body } => {
-                    let mut prev_state: State<T> = state.clone();
-
-                    let (post_state, cond_inv, body_inv) = loop {
-                        let cond_state = T::eval_bexpr(&cond, &prev_state);
-                        let body_eval = cond_state.eval_stmt(body, &Invariant::new());
-                        let curr_state = cond_state.widen(&body_eval.0);
-
-                        match prev_state == curr_state {
-                            true => break (curr_state, vec![cond_state], body_eval.1),
-                            _ => prev_state = curr_state,
-                        }
-                    };
-
-                    let narrowed_state = post_state.narrow(body_inv.last().unwrap());
-                    let exit_state = T::eval_bexpr(&negate_bexpr(&cond), &narrowed_state);
-
-                    (
-                        narrowed_state,
-                        inv.append(&[cond_inv, body_inv, vec![exit_state]]),
-                    )
-                }
-            },
-        }
-    }
-
     pub fn new() -> Self {
         State::Just(HashMap::new())
     }
@@ -177,6 +113,8 @@ impl<T: Domain> PartialEq for State<T> {
 
 fn point_wise_op<T: Domain>(s1: &State<T>, s2: &State<T>, op: fn(T, T) -> T) -> State<T> {
     match (s1, s2) {
+        (State::Bottom, _) => s2.clone(),
+        (_, State::Bottom) => s1.clone(),
         (State::Just(s1), State::Just(s2)) => {
             let mut new_state = State::new();
             for (var1, val1) in s1 {
@@ -187,6 +125,71 @@ fn point_wise_op<T: Domain>(s1: &State<T>, s2: &State<T>, op: fn(T, T) -> T) -> 
             }
             new_state
         }
-        _ => State::Bottom,
     }
 }
+
+// --- ALTERNATIVE IMPLEMANTION
+/*
+ pub fn eval_stmt(&self, ast: &Statement, inv: &Invariant<T>) -> (State<T>, Invariant<T>) {
+        let state = self.clone();
+        match state {
+            State::Bottom => (state.clone(), inv.clone()),
+            _ => match ast {
+                Statement::Skip => (state.clone(), inv.append(&[vec![state.clone()]])),
+
+                Statement::Chain(s1, s2) => {
+                    let (new_state, new_inv) = state.eval_stmt(s1, inv);
+                    new_state.eval_stmt(s2, &new_inv)
+                }
+
+                Statement::Assignment { var, val } => {
+                    let (interval, new_state) = T::eval_aexpr(&val, &state);
+                    let new_state = new_state.put(&var, interval);
+                    (new_state.clone(), inv.append(&[vec![new_state]]))
+                }
+
+                Statement::If { cond, s1, s2 } => {
+                    let tt_state = T::eval_bexpr(&cond, &state);
+                    let ff_state = T::eval_bexpr(&negate_bexpr(&cond), &state);
+                    let (s1_state, s1_inv) = tt_state.eval_stmt(s1, &Invariant::new());
+                    let (s2_state, s2_inv) = ff_state.eval_stmt(s2, &Invariant::new());
+
+                    let end_state = s1_state.union(&s2_state);
+                    (
+                        end_state.clone(),
+                        inv.append(&[
+                            vec![tt_state],
+                            s1_inv,
+                            vec![ff_state],
+                            s2_inv,
+                            vec![end_state],
+                        ]),
+                    )
+                }
+
+                Statement::While { cond, body } => {
+                    let mut prev_state: State<T> = state.clone();
+
+                    let (post_state, cond_inv, body_inv) = loop {
+                        let cond_state = T::eval_bexpr(&cond, &prev_state);
+                        let body_eval = cond_state.eval_stmt(body, &Invariant::new());
+                        let curr_state = cond_state.widen(&body_eval.0);
+
+                        match prev_state == curr_state {
+                            true => break (curr_state, vec![cond_state], body_eval.1),
+                            _ => prev_state = curr_state,
+                        }
+                    };
+
+                    let narrowed_state = post_state.narrow(body_inv.last().unwrap());
+                    let end_state = T::eval_bexpr(&negate_bexpr(&cond), &narrowed_state);
+
+                    (
+                        narrowed_state,
+                        inv.append(&[cond_inv, body_inv, vec![end_state]]),
+                    )
+                }
+            },
+        }
+    }
+*/

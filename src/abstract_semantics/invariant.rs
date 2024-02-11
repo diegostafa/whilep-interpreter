@@ -23,7 +23,8 @@ impl<T: Domain> InvariantOperations for Invariant<T> {
     }
 
     fn pretty_print(&self) {
-        for state in self {
+        for (i, state) in self.iter().enumerate() {
+            print!("{}: ", i);
             state.pretty_print();
         }
     }

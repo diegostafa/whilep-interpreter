@@ -7,6 +7,23 @@ use crate::types::integer::*;
 type StateFunction = Box<dyn Fn(State) -> Option<State>>;
 type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
 
+// --- ast denotation
+
+pub fn denote_stmt(ast: Statement) -> StateFunction {
+    match ast {
+        Statement::Skip => id(),
+        Statement::Chain(s1, s2) => compose(denote_stmt(*s1), denote_stmt(*s2)),
+        Statement::Assignment { var, val } => state_update(var, *val),
+        Statement::If { cond, s1, s2 } => conditional(*cond, denote_stmt(*s1), denote_stmt(*s2)),
+        Statement::While { cond, body } => {
+            let f = Box::new(move |g| {
+                conditional(*cond.clone(), compose(denote_stmt(*body.clone()), g), id())
+            });
+            lfp(f)
+        }
+    }
+}
+
 // --- semantic functions
 
 fn bottom() -> StateFunction {
@@ -38,7 +55,7 @@ fn conditional(cond: BooleanExpr, s1: StateFunction, s2: StateFunction) -> State
     })
 }
 
-fn fix(f: Functional) -> StateFunction {
+fn lfp(f: Functional) -> StateFunction {
     Box::new(move |state| {
         let mut g = bottom();
         loop {
@@ -49,23 +66,6 @@ fn fix(f: Functional) -> StateFunction {
             }
         }
     })
-}
-
-// --- ast denotation
-
-pub fn denote_stmt(ast: Statement) -> StateFunction {
-    match ast {
-        Statement::Skip => id(),
-        Statement::Chain(s1, s2) => compose(denote_stmt(*s1), denote_stmt(*s2)),
-        Statement::Assignment { var, val } => state_update(var, *val),
-        Statement::If { cond, s1, s2 } => conditional(*cond, denote_stmt(*s1), denote_stmt(*s2)),
-        Statement::While { cond, body } => {
-            let f = Box::new(move |g| {
-                conditional(*cond.clone(), compose(denote_stmt(*body.clone()), g), id())
-            });
-            fix(f)
-        }
-    }
 }
 
 pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> (Integer, State) {
@@ -106,24 +106,15 @@ pub fn eval_bexpr(expr: &BooleanExpr, state: &State) -> (bool, State) {
 
 // --- helpers
 
-fn trans_aexpr(
-    a1: &ArithmeticExpr,
-    a2: &ArithmeticExpr,
-    state: &State,
-) -> (Integer, Integer, State) {
-    let (a1_interval, new_state) = eval_aexpr(a1, &state);
-    let (a2_interval, new_state) = eval_aexpr(a2, &new_state);
-    (a1_interval, a2_interval, new_state)
-}
-
 fn binop_aexpr(
     op: fn(Integer, Integer) -> Integer,
     a1: &ArithmeticExpr,
     a2: &ArithmeticExpr,
     state: &State,
 ) -> (Integer, State) {
-    let (a1_val, a2_val, new_state) = trans_aexpr(a1, a2, &state);
-    (op(a1_val, a2_val), new_state)
+    let (a1_interval, new_state) = eval_aexpr(a1, &state);
+    let (a2_interval, new_state) = eval_aexpr(a2, &new_state);
+    (op(a1_interval, a2_interval), new_state)
 }
 
 fn binop_bexpr(
@@ -143,6 +134,7 @@ fn binop_cmp(
     a2: &ArithmeticExpr,
     state: &State,
 ) -> (bool, State) {
-    let (a1_val, a2_val, new_state) = trans_aexpr(a1, a2, &state);
-    (op(a1_val, a2_val), new_state)
+    let (a1_interval, new_state) = eval_aexpr(a1, &state);
+    let (a2_interval, new_state) = eval_aexpr(a2, &new_state);
+    (op(a1_interval, a2_interval), new_state)
 }

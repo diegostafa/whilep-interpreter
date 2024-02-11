@@ -9,9 +9,12 @@ use crate::domain::lattice::*;
 use crate::parser::ast::*;
 use crate::types::integer::*;
 
+pub static mut LOWER_BOUND: Integer = Integer::NegInf;
+pub static mut UPPER_BOUND: Integer = Integer::PosInf;
+
 #[derive(Debug, Clone, Copy, Eq)]
 pub enum Interval {
-    Bottom,
+    Empty,
     Range(Integer, Integer),
 }
 
@@ -22,15 +25,26 @@ impl Interval {
 
     pub fn add_min(&self, val: Integer) -> Self {
         match *self {
-            Interval::Bottom => Interval::Bottom,
-            Interval::Range(min, max) => Interval::Range(min + val, max),
+            Interval::Empty => Interval::Empty,
+            Interval::Range(a, b) => Interval::Range(a + val, b),
         }
     }
 
     pub fn add_max(&self, val: Integer) -> Self {
         match *self {
-            Interval::Bottom => Interval::Bottom,
-            Interval::Range(min, max) => Interval::Range(min, max + val),
+            Interval::Empty => Interval::Empty,
+            Interval::Range(a, b) => Interval::Range(a, b + val),
+        }
+    }
+
+    pub fn clamp(&self) -> Self {
+        match *self {
+            Interval::Empty => Interval::Empty,
+            Interval::Range(a, b) => unsafe {
+                let min = if a < LOWER_BOUND { Integer::NegInf } else { a };
+                let max = if b > UPPER_BOUND { Integer::PosInf } else { b };
+                Interval::Range(min, max)
+            },
         }
     }
 }
@@ -70,7 +84,7 @@ impl Domain for Interval {
             BooleanExpr::NumEq(a1, a2) => {
                 let (i1, i2, new_state) = trans_aexpr(a1, a2, &state);
                 match i1.intersection(&i2) {
-                    Interval::Bottom => State::Bottom,
+                    Interval::Empty => State::Bottom,
                     intersection => new_state
                         .try_put(a1, intersection)
                         .try_put(a2, intersection),
@@ -86,7 +100,7 @@ impl Domain for Interval {
                 let lhs = i1.intersection(&i2.add_min(Integer::NegInf).add_max(-one));
                 let rhs = i2.intersection(&i1.add_max(Integer::PosInf).add_min(one));
                 match (lhs, rhs) {
-                    (Interval::Bottom, _) | (_, Interval::Bottom) => State::Bottom,
+                    (Interval::Empty, _) | (_, Interval::Empty) => State::Bottom,
                     _ => new_state.try_put(a1, lhs).try_put(a2, rhs),
                 }
             }
@@ -95,7 +109,7 @@ impl Domain for Interval {
                 let lhs = i1.intersection(&i2.add_min(Integer::NegInf));
                 let rhs = i2.intersection(&i1.add_max(Integer::PosInf));
                 match (lhs, rhs) {
-                    (Interval::Bottom, _) | (_, Interval::Bottom) => State::Bottom,
+                    (Interval::Empty, _) | (_, Interval::Empty) => State::Bottom,
                     _ => new_state.try_put(a1, lhs).try_put(a2, rhs),
                 }
             }
@@ -111,34 +125,36 @@ impl Domain for Interval {
 
 impl Lattice for Interval {
     const TOP: Self = Interval::Range(Integer::NegInf, Integer::PosInf);
-    const BOT: Self = Interval::Bottom;
+    const BOT: Self = Interval::Empty;
 
     fn union(&self, other: &Self) -> Self {
         match (*self, *other) {
-            (a, Interval::Bottom) => a,
-            (Interval::Bottom, b) => b,
+            (a, Interval::Empty) => a,
+            (Interval::Empty, b) => b,
             (Interval::Range(a, b), Interval::Range(c, d)) => {
                 Interval::Range(cmp::min(a, c), cmp::max(b, d))
             }
         }
+        .clamp()
     }
 
     fn intersection(&self, other: &Self) -> Self {
         match (*self, *other) {
-            (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
+            (Interval::Empty, _) | (_, Interval::Empty) => Interval::Empty,
             (Interval::Range(a, b), Interval::Range(c, d)) => {
                 match (cmp::max(a, c), cmp::min(b, d)) {
                     (min, max) if min <= max => Interval::Range(min, max),
-                    _ => Interval::Bottom,
+                    _ => Interval::Empty,
                 }
             }
         }
+        .clamp()
     }
 
     fn widen(&self, other: &Self) -> Self {
         match (*self, *other) {
-            (a, Interval::Bottom) => a,
-            (Interval::Bottom, b) => b,
+            (a, Interval::Empty) => a,
+            (Interval::Empty, b) => b,
             (Interval::Range(a, b), Interval::Range(c, d)) => {
                 let min = if a <= c { a } else { Integer::NegInf };
                 let max = if b >= d { b } else { Integer::PosInf };
@@ -149,21 +165,22 @@ impl Lattice for Interval {
 
     fn narrow(&self, other: &Self) -> Self {
         match (*self, *other) {
-            (Interval::Bottom, _) | (_, Interval::Bottom) => Interval::Bottom,
+            (Interval::Empty, _) | (_, Interval::Empty) => Interval::Empty,
             (Interval::Range(a, b), Interval::Range(c, d)) => {
                 let min = if a == Integer::NegInf { c } else { a };
                 let max = if b == Integer::PosInf { d } else { b };
                 Interval::Range(min, max)
             }
         }
+        .clamp()
     }
 }
 
 impl PartialEq for Interval {
     fn eq(&self, other: &Self) -> bool {
         match (*self, *other) {
-            (Interval::Bottom, Interval::Bottom) => true,
-            (Interval::Bottom, _) | (_, Interval::Bottom) => false,
+            (Interval::Empty, Interval::Empty) => true,
+            (Interval::Empty, _) | (_, Interval::Empty) => false,
             (Interval::Range(a, b), Interval::Range(c, d)) => a == c && b == d,
         }
     }
@@ -172,8 +189,7 @@ impl PartialEq for Interval {
 impl fmt::Display for Interval {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Interval::Bottom => write!(f, "Empty interval"),
-            // Interval::Range(a, b) if a == b => write!(f, "{}", a),
+            Interval::Empty => write!(f, "Empty interval"),
             Interval::Range(a, b) => write!(f, "[{}, {}]", a, b),
         }
     }
@@ -184,7 +200,7 @@ impl ops::Neg for Interval {
 
     fn neg(self) -> Self {
         match self {
-            Interval::Bottom => self,
+            Interval::Empty => self,
             Interval::Range(a, b) => Interval::Range(-b, -a),
         }
     }
@@ -196,7 +212,7 @@ impl ops::Add<Interval> for Interval {
     fn add(self, other: Self) -> Self {
         match (self, other) {
             (Interval::Range(a, b), Interval::Range(c, d)) => Interval::Range(a + c, b + d),
-            _ => Interval::Bottom,
+            _ => Interval::Empty,
         }
     }
 }
@@ -207,7 +223,7 @@ impl ops::Sub<Interval> for Interval {
     fn sub(self, other: Self) -> Self {
         match (self, other) {
             (Interval::Range(a, b), Interval::Range(c, d)) => Interval::Range(a - d, b - c),
-            _ => Interval::Bottom,
+            _ => Interval::Empty,
         }
     }
 }
@@ -223,7 +239,7 @@ impl ops::Mul<Interval> for Interval {
                 let max = bounds.iter().max().unwrap();
                 Interval::Range(*min, *max)
             }
-            _ => Interval::Bottom,
+            _ => Interval::Empty,
         }
     }
 }
@@ -257,7 +273,7 @@ impl ops::Div<Interval> for Interval {
                     }
                 }
             }
-            _ => Interval::Bottom,
+            _ => Interval::Empty,
         }
     }
 }
