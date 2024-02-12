@@ -7,7 +7,7 @@ use crate::domain::lattice::*;
 use crate::parser::ast::*;
 use crate::types::integer::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Constant {
     None,
     Value(Integer),
@@ -19,16 +19,20 @@ impl Lattice for Constant {
     const BOT: Self = Constant::None;
 
     fn union(&self, other: &Self) -> Self {
-        match self == other {
-            true => *self,
+        match (self, other) {
+            _ if self == other => *self,
+            (Constant::None, _) => *other,
+            (_, Constant::None) => *self,
             _ => Constant::Any,
         }
     }
 
     fn intersection(&self, other: &Self) -> Self {
-        match self == other {
-            true => *self,
-            _ => Constant::None,
+        match (self, other) {
+            _ if self == other => *self,
+            (Constant::Any, _) => *other,
+            (_, Constant::Any) => *self,
+            _ => Constant::Any,
         }
     }
 
@@ -73,12 +77,29 @@ impl Domain for Constant {
             BooleanExpr::Or(b1, b2) => {
                 Self::eval_bexpr(b1, state).union(&Self::eval_bexpr(b2, state))
             }
-            BooleanExpr::NumEq(_, _) => todo!(),
-            BooleanExpr::NumNotEq(_, _) => todo!(),
-            BooleanExpr::NumLt(_, _) => todo!(),
-            BooleanExpr::NumGt(_, _) => todo!(),
-            BooleanExpr::NumLtEq(_, _) => todo!(),
-            BooleanExpr::NumGtEq(_, _) => todo!(),
+            BooleanExpr::NumEq(a1, a2) => {
+                let (i1, i2, new_state) = trans_aexpr(a1, a2, state);
+                match i1.intersection(&i2) {
+                    Constant::None => State::Bottom,
+                    intersection => new_state
+                        .try_put(a1, intersection)
+                        .try_put(a2, intersection),
+                }
+            }
+            BooleanExpr::NumNotEq(a1, a2) => binop_cmp(|a, b| a != b, a1, a2, state),
+            BooleanExpr::NumLt(a1, a2) => binop_cmp(|a, b| a < b, a1, a2, state),
+
+            BooleanExpr::NumLtEq(a1, a2) => {
+                let lt = Self::eval_bexpr(&BooleanExpr::NumLt(a1.clone(), a2.clone()), state);
+                let eq = Self::eval_bexpr(&BooleanExpr::NumEq(a1.clone(), a2.clone()), state);
+                lt.union(&eq)
+            }
+            BooleanExpr::NumGt(a1, a2) => {
+                Self::eval_bexpr(&BooleanExpr::NumLt(a2.clone(), a1.clone()), state)
+            }
+            BooleanExpr::NumGtEq(a1, a2) => {
+                Self::eval_bexpr(&BooleanExpr::NumLtEq(a2.clone(), a1.clone()), state)
+            }
         }
     }
 }

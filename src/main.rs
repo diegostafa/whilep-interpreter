@@ -42,6 +42,8 @@ fn run_abstract<T: Domain>(ast: &Statement) {
     let (_, inv) = induced_function((State::new(), Invariant::new()));
     let points = get_program_points(ast.clone());
 
+    assert!(inv.len() == points.len());
+
     println!("[INFO] invariants");
     let headers = vec![
         "#".to_string(),

@@ -33,3 +33,16 @@ pub fn binop_aexpr<T: Domain>(
     let (i1, i2, new_state) = trans_aexpr(a1, a2, &state);
     (op(i1, i2), new_state)
 }
+
+pub fn binop_cmp<T: Domain>(
+    op: fn(T, T) -> bool,
+    a1: &ArithmeticExpr,
+    a2: &ArithmeticExpr,
+    state: &State<T>,
+) -> State<T> {
+    let (i1, i2, new_state) = trans_aexpr(a1, a2, &state);
+    match op(i1, i2) {
+        true => new_state,
+        _ => State::Bottom,
+    }
+}

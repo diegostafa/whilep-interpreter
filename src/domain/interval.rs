@@ -105,13 +105,9 @@ impl Domain for Interval {
                 }
             }
             BooleanExpr::NumLtEq(a1, a2) => {
-                let (i1, i2, new_state) = trans_aexpr(a1, a2, &state);
-                let lhs = i1.intersection(&i2.add_min(Integer::NegInf));
-                let rhs = i2.intersection(&i1.add_max(Integer::PosInf));
-                match (lhs, rhs) {
-                    (Interval::Empty, _) | (_, Interval::Empty) => State::Bottom,
-                    _ => new_state.try_put(a1, lhs).try_put(a2, rhs),
-                }
+                let lt = Self::eval_bexpr(&BooleanExpr::NumLt(a1.clone(), a2.clone()), state);
+                let eq = Self::eval_bexpr(&BooleanExpr::NumEq(a1.clone(), a2.clone()), state);
+                lt.union(&eq)
             }
             BooleanExpr::NumGt(a1, a2) => {
                 Self::eval_bexpr(&BooleanExpr::NumLt(a2.clone(), a1.clone()), state)

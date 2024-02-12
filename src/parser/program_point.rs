@@ -14,12 +14,7 @@ pub enum ProgramPoint {
 impl fmt::Display for ProgramPoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ProgramPoint::Stmt(s) => match s {
-                Statement::Skip | Statement::Assignment { var: _, val: _ } => {
-                    write!(f, "{}", s)
-                }
-                _ => unreachable!(),
-            },
+            ProgramPoint::Stmt(s) => write!(f, "{}", s),
             ProgramPoint::IfGuard(b) => write!(f, "[if-guard] {}", b),
             ProgramPoint::ElseGuard(b) => write!(f, "[else-guard] {}", b),
             ProgramPoint::EndIf => write!(f, "[end-if]"),
