@@ -21,8 +21,8 @@ impl Lattice for Constant {
     fn union(&self, other: &Self) -> Self {
         match (self, other) {
             _ if self == other => *self,
-            (Constant::None, _) => *other,
             (_, Constant::None) => *self,
+            (Constant::None, _) => *other,
             _ => Constant::Any,
         }
     }
@@ -30,9 +30,9 @@ impl Lattice for Constant {
     fn intersection(&self, other: &Self) -> Self {
         match (self, other) {
             _ if self == other => *self,
-            (Constant::Any, _) => *other,
             (_, Constant::Any) => *self,
-            _ => Constant::Any,
+            (Constant::Any, _) => *other,
+            _ => Constant::None,
         }
     }
 
@@ -78,15 +78,19 @@ impl Domain for Constant {
                 Self::eval_bexpr(b1, state).union(&Self::eval_bexpr(b2, state))
             }
             BooleanExpr::NumEq(a1, a2) => {
-                let (i1, i2, new_state) = trans_aexpr(a1, a2, state);
+                let (ltree, new_state) = Self::build_expression_tree(a1, state);
+                let (rtree, new_state) = Self::build_expression_tree(a2, &new_state);
+                let (i1, i2) = (ltree.get_value(), rtree.get_value());
+
                 match i1.intersection(&i2) {
                     Constant::None => State::Bottom,
                     intersection => new_state
-                        .try_put(a1, intersection)
-                        .try_put(a2, intersection),
+                        .refine_expression_tree(&ltree, intersection)
+                        .refine_expression_tree(&rtree, intersection),
                 }
             }
             BooleanExpr::NumNotEq(a1, a2) => binop_cmp(|a, b| a != b, a1, a2, state),
+
             BooleanExpr::NumLt(a1, a2) => binop_cmp(|a, b| a < b, a1, a2, state),
 
             BooleanExpr::NumLtEq(a1, a2) => {
@@ -165,10 +169,12 @@ impl ops::Div<Constant> for Constant {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
+        let zero = Integer::Value(0);
         match (self, other) {
             (Constant::None, _) | (_, Constant::None) => Constant::None,
             (Constant::Any, _) | (_, Constant::Any) => Constant::Any,
-            (Constant::Value(a), Constant::Value(b)) => Constant::Value(a + b),
+            (Constant::Value(_), Constant::Value(b)) if b == zero => Constant::None,
+            (Constant::Value(a), Constant::Value(b)) => Constant::Value(a / b),
         }
     }
 }

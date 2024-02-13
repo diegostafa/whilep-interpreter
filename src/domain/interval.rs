@@ -81,27 +81,38 @@ impl Domain for Interval {
             BooleanExpr::Or(b1, b2) => {
                 Self::eval_bexpr(b1, state).union(&Self::eval_bexpr(b2, state))
             }
+
             BooleanExpr::NumEq(a1, a2) => {
-                let (i1, i2, new_state) = trans_aexpr(a1, a2, &state);
+                let (ltree, new_state) = Self::build_expression_tree(a1, state);
+                let (rtree, new_state) = Self::build_expression_tree(a2, &new_state);
+                let (i1, i2) = (ltree.get_value(), rtree.get_value());
+
                 match i1.intersection(&i2) {
                     Interval::Empty => State::Bottom,
                     intersection => new_state
-                        .try_put(a1, intersection)
-                        .try_put(a2, intersection),
+                        .refine_expression_tree(&ltree, intersection)
+                        .refine_expression_tree(&rtree, intersection),
                 }
             }
             BooleanExpr::NumNotEq(a1, a2) => {
-                let (_, _, new_state) = trans_aexpr(a1, a2, &state);
+                let (_, new_state) = Self::eval_aexpr(a1, &state);
+                let (_, new_state) = Self::eval_aexpr(a2, &new_state);
                 new_state
             }
             BooleanExpr::NumLt(a1, a2) => {
-                let (i1, i2, new_state) = trans_aexpr(a1, a2, &state);
+                let (ltree, new_state) = Self::build_expression_tree(a1, state);
+                let (rtree, new_state) = Self::build_expression_tree(a2, &new_state);
+                let (i1, i2) = (ltree.get_value(), rtree.get_value());
+
                 let one = Integer::Value(1);
                 let lhs = i1.intersection(&i2.add_min(Integer::NegInf).add_max(-one));
                 let rhs = i2.intersection(&i1.add_max(Integer::PosInf).add_min(one));
+
                 match (lhs, rhs) {
                     (Interval::Empty, _) | (_, Interval::Empty) => State::Bottom,
-                    _ => new_state.try_put(a1, lhs).try_put(a2, rhs),
+                    _ => new_state
+                        .refine_expression_tree(&ltree, lhs)
+                        .refine_expression_tree(&rtree, rhs),
                 }
             }
             BooleanExpr::NumLtEq(a1, a2) => {

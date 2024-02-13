@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use crate::domain::domain::*;
+use crate::domain::expression_tree::*;
 use crate::domain::lattice::*;
 use crate::parser::ast::*;
 
@@ -37,14 +38,26 @@ impl<T: Domain> State<T> {
         }
     }
 
-    pub fn try_put(&self, var: &ArithmeticExpr, val: T) -> Self {
-        match (self.clone(), var) {
-            (State::Just(mut s), ArithmeticExpr::Identifier(var)) => {
-                s.insert(var.to_string(), val);
-                State::Just(s)
+    pub fn refine_expression_tree(&self, tree: &ExpressionTree<T>, refined_value: T) -> Self {
+        match tree {
+            ExpressionTree::Value(_) => self.clone(),
+            ExpressionTree::Variable(var, val) => self.put(var, val.intersection(&refined_value)),
+            ExpressionTree::Binop(op, val, l, r) => {
+                let c = val.intersection(&refined_value);
+                let a = l.get_value();
+                let b = r.get_value();
+
+                let (lval, rval) = match op {
+                    ArithmeticExpr::Add(_, _) => (c.clone() - b, c - a),
+                    ArithmeticExpr::Sub(_, _) => (c.clone() + b, a - c),
+                    ArithmeticExpr::Mul(_, _) => (c.clone() / b, c / a),
+                    ArithmeticExpr::Div(_, _) => (c.clone() * b, a / c),
+                    _ => unreachable!(),
+                };
+
+                self.refine_expression_tree(l, lval)
+                    .refine_expression_tree(r, rval)
             }
-            (State::Just(_), _) => self.clone(),
-            _ => State::Bottom,
         }
     }
 }
@@ -97,7 +110,7 @@ impl<T: Domain> fmt::Display for State<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             State::Bottom => write!(f, "BOTTOM STATE"),
-            State::Just(s) if s.is_empty() => write!(f, "EMPTY STATE"),
+            State::Just(s) if s.is_empty() => write!(f, "-"),
             State::Just(s) => {
                 let mut pretty_state = s
                     .iter()
