@@ -153,10 +153,21 @@ pub fn is_same_aexpr(a1: &ArithmeticExpr, a2: &ArithmeticExpr) -> bool {
         | (ArithmeticExpr::Interval(_, _), _)
         | (_, ArithmeticExpr::Interval(_, _)) => false,
 
-        _ => {
+        (ArithmeticExpr::Add(_, _), ArithmeticExpr::Add(_, _))
+        | (ArithmeticExpr::Mul(_, _), ArithmeticExpr::Mul(_, _)) => {
+            let (lhs1, lhs2) = binop_nodes(a1.clone());
+            let (rhs1, rhs2) = binop_nodes(a2.clone());
+            (is_same_aexpr(&lhs1, &rhs1) && is_same_aexpr(&lhs2, &rhs2))
+                || (is_same_aexpr(&lhs1, &rhs2) && is_same_aexpr(&lhs2, &rhs1))
+        }
+
+        (ArithmeticExpr::Sub(_, _), ArithmeticExpr::Sub(_, _))
+        | (ArithmeticExpr::Div(_, _), ArithmeticExpr::Div(_, _)) => {
             let (lhs1, lhs2) = binop_nodes(a1.clone());
             let (rhs1, rhs2) = binop_nodes(a2.clone());
             is_same_aexpr(&lhs1, &rhs1) && is_same_aexpr(&lhs2, &rhs2)
         }
+
+        _ => false,
     }
 }
