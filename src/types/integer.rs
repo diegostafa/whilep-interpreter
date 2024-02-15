@@ -1,11 +1,10 @@
+use crate::types::sign::*;
+use rand::Rng;
 use std::{
     fmt::{self},
     ops::{self},
     str::FromStr,
 };
-
-use crate::types::sign::*;
-use rand::Rng;
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
 pub enum Integer {

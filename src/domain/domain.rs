@@ -1,11 +1,10 @@
-use std::fmt::{Debug, Display};
-use std::ops::{Add, Div, Mul, Sub};
-use trait_set::trait_set;
-
 use crate::abstract_semantics::state::*;
 use crate::domain::expression_tree::*;
 use crate::domain::lattice::*;
 use crate::parser::ast::*;
+use std::fmt::{Debug, Display};
+use std::ops::{Add, Div, Mul, Sub};
+use trait_set::trait_set;
 
 trait_set! {
     pub trait Arithmetic = Sized + Add<Self, Output = Self> +Sub<Self, Output = Self> +Mul<Self, Output = Self> +Div<Self, Output = Self>;

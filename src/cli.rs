@@ -1,5 +1,4 @@
 use clap::Parser;
-
 use cli_tables::Table;
 
 #[derive(Parser)]

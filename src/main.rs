@@ -1,14 +1,12 @@
-use std::fs;
-use std::str::FromStr;
-
-use cli::*;
-
 use crate::abstract_semantics::invariant::*;
 use crate::domain::constant::*;
 use crate::domain::domain::*;
 use crate::domain::interval::*;
 use crate::parser::ast::*;
 use crate::parser::program_point::*;
+use cli::*;
+use std::fs;
+use std::str::FromStr;
 
 mod abstract_semantics;
 mod cli;

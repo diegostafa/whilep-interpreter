@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
 use crate::types::integer::*;
-
+use std::collections::HashMap;
 pub type State = HashMap<String, Integer>;
 
 pub trait StateOperations {

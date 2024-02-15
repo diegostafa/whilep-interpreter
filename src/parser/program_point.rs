@@ -1,6 +1,5 @@
-use std::fmt::{self};
-
 use crate::parser::ast::*;
+use std::fmt::{self};
 
 pub enum ProgramPoint {
     Stmt(Statement),

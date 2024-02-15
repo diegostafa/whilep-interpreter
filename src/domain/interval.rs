@@ -1,15 +1,14 @@
-use std::{
-    cmp, fmt,
-    ops::{self, Neg},
-    str::FromStr,
-};
-
 use crate::abstract_semantics::state::*;
 use crate::domain::domain::*;
 use crate::domain::lattice::*;
 use crate::parser::ast::*;
 use crate::types::integer::*;
 use crate::utils::math::*;
+use std::{
+    cmp, fmt,
+    ops::{self, Neg},
+    str::FromStr,
+};
 
 pub static mut LOWER_BOUND: Integer = Integer::NegInf;
 pub static mut UPPER_BOUND: Integer = Integer::PosInf;
@@ -45,7 +44,7 @@ impl Interval {
                 Interval::Empty => Interval::Empty,
                 _ if LOWER_BOUND == Integer::NegInf => *self,
                 Interval::Range(a, b) => {
-                    let min = if a < LOWER_BOUND { Integer::NegInf } else { a };
+                    let min = if a < LOWER_BOUND { LOWER_BOUND } else { a };
                     Interval::Range(min, b)
                 }
             }
@@ -58,7 +57,7 @@ impl Interval {
                 Interval::Empty => Interval::Empty,
                 _ if UPPER_BOUND == Integer::PosInf => *self,
                 Interval::Range(a, b) => {
-                    let max = if b > UPPER_BOUND { Integer::PosInf } else { b };
+                    let max = if b > UPPER_BOUND { UPPER_BOUND } else { b };
                     Interval::Range(a, max)
                 }
             }

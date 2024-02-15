@@ -1,8 +1,6 @@
-use std::fmt;
-
-use lalrpop_util::{lalrpop_mod, lexer::Token, ParseError};
-
 use crate::types::integer::*;
+use lalrpop_util::{lalrpop_mod, lexer::Token, ParseError};
+use std::fmt;
 
 lalrpop_mod!(pub whilep);
 

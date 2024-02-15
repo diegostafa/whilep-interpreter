@@ -81,7 +81,7 @@ fn lfp<'a, T: Domain + 'a>(cond: BooleanExpr, body: StateFunction<'a, T>) -> Sta
         });
 
         let fix = |f: StateTransformer<T>| {
-            let mut prev_state = state.clone();
+            let mut prev_state = State::Bottom;
             loop {
                 let (cond_state, body_inv, done_state) = f(&prev_state);
                 match prev_state == done_state {

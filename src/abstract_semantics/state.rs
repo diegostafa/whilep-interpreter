@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-use std::fmt;
-
 use crate::domain::domain::*;
 use crate::domain::expression_tree::*;
 use crate::domain::lattice::*;
 use crate::parser::ast::*;
+use std::collections::HashMap;
+use std::fmt;
 
 #[derive(Debug, Clone, Eq)]
 pub enum State<T: Domain> {

@@ -1,11 +1,10 @@
-use std::fmt;
-use std::ops;
-
 use crate::abstract_semantics::state::*;
 use crate::domain::domain::*;
 use crate::domain::lattice::*;
 use crate::parser::ast::*;
 use crate::types::integer::*;
+use std::fmt;
+use std::ops;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Constant {
