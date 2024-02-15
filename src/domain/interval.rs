@@ -44,7 +44,7 @@ impl Interval {
                 Interval::Empty => Interval::Empty,
                 _ if LOWER_BOUND == Integer::NegInf => *self,
                 Interval::Range(a, b) => {
-                    let min = if a < LOWER_BOUND { LOWER_BOUND } else { a };
+                    let min = if a < LOWER_BOUND { Integer::NegInf } else { a };
                     Interval::Range(min, b)
                 }
             }
@@ -57,7 +57,7 @@ impl Interval {
                 Interval::Empty => Interval::Empty,
                 _ if UPPER_BOUND == Integer::PosInf => *self,
                 Interval::Range(a, b) => {
-                    let max = if b > UPPER_BOUND { UPPER_BOUND } else { b };
+                    let max = if b > UPPER_BOUND { Integer::PosInf } else { b };
                     Interval::Range(a, max)
                 }
             }
@@ -99,11 +99,7 @@ impl Domain for Interval {
                     }
                 }
             }
-            BooleanExpr::NumNotEq(a1, a2) => {
-                let (_, new_state) = Self::eval_aexpr(a1, state);
-                let (_, new_state) = Self::eval_aexpr(a2, &new_state);
-                new_state
-            }
+
             BooleanExpr::NumLt(a1, a2) => {
                 let (ltree, _) = Self::build_expression_tree(a1, state);
                 let (rtree, _) = Self::build_expression_tree(a2, state);
@@ -126,7 +122,7 @@ impl Domain for Interval {
                     }
                 }
             }
-            _ => unreachable!("{}", cmp_expr),
+            _ => unreachable!(),
         }
     }
 }
@@ -235,7 +231,7 @@ impl fmt::Display for Interval {
         match self {
             Interval::Empty => write!(f, "Empty interval"),
             Interval::Range(a, b) if a == b => write!(f, "[{}]", a),
-            Interval::Range(a, b) => write!(f, "[{}, {}]", a, b),
+            Interval::Range(a, b) => write!(f, "[{},{}]", a, b),
         }
     }
 }

@@ -68,9 +68,14 @@ impl Domain for Constant {
                         .refine_expression_tree(&rtree, intersection),
                 }
             }
-            BooleanExpr::NumNotEq(a1, a2) => binop_cmp(|a, b| a != b, a1, a2, state),
-            BooleanExpr::NumLt(a1, a2) => binop_cmp(|a, b| a < b, a1, a2, state),
-
+            BooleanExpr::NumLt(a1, a2) => {
+                let (lhs, new_state) = Self::eval_aexpr(a1, &state);
+                let (rhs, new_state) = Self::eval_aexpr(a2, &new_state);
+                match lhs < rhs {
+                    true => new_state,
+                    _ => State::Bottom,
+                }
+            }
             _ => unreachable!(),
         }
     }

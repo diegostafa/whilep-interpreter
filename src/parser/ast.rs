@@ -126,3 +126,37 @@ impl fmt::Display for BooleanExpr {
         }
     }
 }
+
+pub fn is_same_aexpr(a1: &ArithmeticExpr, a2: &ArithmeticExpr) -> bool {
+    let binop_nodes = |a: ArithmeticExpr| match a {
+        ArithmeticExpr::Add(a1, a2) => (a1, a2),
+        ArithmeticExpr::Sub(a1, a2) => (a1, a2),
+        ArithmeticExpr::Mul(a1, a2) => (a1, a2),
+        ArithmeticExpr::Div(a1, a2) => (a1, a2),
+        _ => unreachable!(),
+    };
+
+    match (a1, a2) {
+        (ArithmeticExpr::Number(a), ArithmeticExpr::Number(b)) => a == b,
+        (ArithmeticExpr::Identifier(a), ArithmeticExpr::Identifier(b)) => a == b,
+        (ArithmeticExpr::PostDecrement(a), ArithmeticExpr::PostDecrement(b)) => a == b,
+        (ArithmeticExpr::PostIncrement(a), ArithmeticExpr::PostIncrement(b)) => a == b,
+
+        (ArithmeticExpr::Number(_), _)
+        | (_, ArithmeticExpr::Number(_))
+        | (ArithmeticExpr::Identifier(_), _)
+        | (_, ArithmeticExpr::Identifier(_))
+        | (ArithmeticExpr::PostDecrement(_), _)
+        | (_, ArithmeticExpr::PostDecrement(_))
+        | (ArithmeticExpr::PostIncrement(_), _)
+        | (_, ArithmeticExpr::PostIncrement(_))
+        | (ArithmeticExpr::Interval(_, _), _)
+        | (_, ArithmeticExpr::Interval(_, _)) => false,
+
+        _ => {
+            let (lhs1, lhs2) = binop_nodes(a1.clone());
+            let (rhs1, rhs2) = binop_nodes(a2.clone());
+            is_same_aexpr(&lhs1, &rhs1) && is_same_aexpr(&lhs2, &rhs2)
+        }
+    }
+}

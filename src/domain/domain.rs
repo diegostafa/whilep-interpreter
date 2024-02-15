@@ -57,12 +57,19 @@ pub trait Domain: DomainProperties {
                 let rhs1 = Self::eval_bexpr(b1, &rhs2);
                 lhs2.union(&rhs1)
             }
+            BooleanExpr::NumNotEq(a1, a2) => match is_same_aexpr(a1, a2) {
+                true => State::Bottom,
+                _ => {
+                    let (_, new_state) = Self::eval_aexpr(a1, state);
+                    let (_, new_state) = Self::eval_aexpr(a2, &new_state);
+                    new_state
+                }
+            },
             BooleanExpr::NumLtEq(a1, a2) => {
                 let lt = Self::eval_bexpr(&BooleanExpr::NumLt(a1.clone(), a2.clone()), state);
                 let eq = Self::eval_bexpr(&BooleanExpr::NumEq(a1.clone(), a2.clone()), state);
                 lt.union(&eq)
             }
-
             BooleanExpr::NumGt(a1, a2) => {
                 Self::eval_bexpr(&BooleanExpr::NumLt(a2.clone(), a1.clone()), state)
             }
@@ -70,9 +77,15 @@ pub trait Domain: DomainProperties {
                 Self::eval_bexpr(&BooleanExpr::NumLtEq(a2.clone(), a1.clone()), state)
             }
 
-            BooleanExpr::NumEq(_, _) | BooleanExpr::NumNotEq(_, _) | BooleanExpr::NumLt(_, _) => {
-                Self::eval_specific_bexpr(expr, state)
-            }
+            BooleanExpr::NumEq(a1, a2) => match is_same_aexpr(a1, a2) {
+                true => Self::eval_specific_bexpr(expr, state),
+                _ => State::Bottom,
+            },
+
+            BooleanExpr::NumLt(a1, a2) => match is_same_aexpr(a1, a2) {
+                true => State::Bottom,
+                _ => Self::eval_specific_bexpr(expr, state),
+            },
         }
     }
 
@@ -118,18 +131,4 @@ pub fn binop_aexpr<T: Domain>(
     let (i1, new_state) = T::eval_aexpr(a1, &state);
     let (i2, new_state) = T::eval_aexpr(a2, &new_state);
     (op(i1, i2), new_state)
-}
-
-pub fn binop_cmp<T: Domain>(
-    op: fn(T, T) -> bool,
-    a1: &ArithmeticExpr,
-    a2: &ArithmeticExpr,
-    state: &State<T>,
-) -> State<T> {
-    let (i1, new_state) = T::eval_aexpr(a1, &state);
-    let (i2, new_state) = T::eval_aexpr(a2, &new_state);
-    match op(i1, i2) {
-        true => new_state,
-        _ => State::Bottom,
-    }
 }
