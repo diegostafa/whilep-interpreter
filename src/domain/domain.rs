@@ -1,5 +1,4 @@
 use crate::abstract_semantics::state::*;
-use crate::domain::expression_tree::*;
 use crate::domain::lattice::*;
 use crate::parser::ast::*;
 use std::fmt::{Debug, Display};
@@ -42,7 +41,7 @@ pub trait Domain: DomainProperties {
         match expr {
             BooleanExpr::True => state.clone(),
             BooleanExpr::False => State::Bottom,
-            BooleanExpr::Not(b) => Self::eval_bexpr(&desugar_not_bexpr(*b.clone()), state),
+            BooleanExpr::Not(b) => Self::eval_bexpr(&negate_bexpr(b), state),
             BooleanExpr::And(b1, b2) => {
                 let lhs1 = Self::eval_bexpr(b1, state);
                 let lhs2 = Self::eval_bexpr(b2, &lhs1);
@@ -57,6 +56,19 @@ pub trait Domain: DomainProperties {
                 let rhs1 = Self::eval_bexpr(b1, &rhs2);
                 lhs2.union(&rhs1)
             }
+            BooleanExpr::NumLtEq(a1, a2) => {
+                let lt = Self::eval_bexpr(&BooleanExpr::NumLt(a1.clone(), a2.clone()), state);
+                let eq = Self::eval_bexpr(&BooleanExpr::NumEq(a1.clone(), a2.clone()), state);
+                lt.union(&eq)
+            }
+
+            BooleanExpr::NumGt(a1, a2) => {
+                Self::eval_bexpr(&BooleanExpr::NumLt(a2.clone(), a1.clone()), state)
+            }
+            BooleanExpr::NumGtEq(a1, a2) => {
+                Self::eval_bexpr(&BooleanExpr::NumLtEq(a2.clone(), a1.clone()), state)
+            }
+
             BooleanExpr::NumNotEq(a1, a2) => match is_same_aexpr(a1, a2) {
                 true => State::Bottom,
                 _ => {
@@ -65,59 +77,13 @@ pub trait Domain: DomainProperties {
                     new_state
                 }
             },
-            BooleanExpr::NumLtEq(a1, a2) => {
-                let lt = Self::eval_bexpr(&BooleanExpr::NumLt(a1.clone(), a2.clone()), state);
-                let eq = Self::eval_bexpr(&BooleanExpr::NumEq(a1.clone(), a2.clone()), state);
-                lt.union(&eq)
-            }
-            BooleanExpr::NumGt(a1, a2) => {
-                Self::eval_bexpr(&BooleanExpr::NumLt(a2.clone(), a1.clone()), state)
-            }
-            BooleanExpr::NumGtEq(a1, a2) => {
-                Self::eval_bexpr(&BooleanExpr::NumLtEq(a2.clone(), a1.clone()), state)
-            }
 
-            BooleanExpr::NumEq(a1, a2) => match is_same_aexpr(a1, a2) {
-                true => Self::eval_specific_bexpr(expr, state),
-                _ => State::Bottom,
-            },
+            BooleanExpr::NumEq(_, _) => Self::eval_specific_bexpr(expr, state),
 
             BooleanExpr::NumLt(a1, a2) => match is_same_aexpr(a1, a2) {
                 true => State::Bottom,
                 _ => Self::eval_specific_bexpr(expr, state),
             },
-        }
-    }
-
-    fn build_expression_tree(
-        expr: &ArithmeticExpr,
-        state: &State<Self>,
-    ) -> (ExpressionTree<Self>, State<Self>) {
-        let (val, new_state) = Self::eval_aexpr(expr, state);
-
-        match expr {
-            ArithmeticExpr::Number(_) | ArithmeticExpr::Interval(_, _) => {
-                (ExpressionTree::Value(val), new_state)
-            }
-
-            ArithmeticExpr::Identifier(var)
-            | ArithmeticExpr::PostIncrement(var)
-            | ArithmeticExpr::PostDecrement(var) => {
-                (ExpressionTree::Variable(var.to_string(), val), new_state)
-            }
-
-            ArithmeticExpr::Add(a1, a2)
-            | ArithmeticExpr::Sub(a1, a2)
-            | ArithmeticExpr::Mul(a1, a2)
-            | ArithmeticExpr::Div(a1, a2) => {
-                let (l, new_state) = Self::build_expression_tree(a1, &new_state);
-                let (r, new_state) = Self::build_expression_tree(a2, &new_state);
-
-                (
-                    ExpressionTree::Binop(expr.clone(), val, Box::new(l), Box::new(r)),
-                    new_state,
-                )
-            }
         }
     }
 }

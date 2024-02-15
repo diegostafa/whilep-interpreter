@@ -7,7 +7,7 @@ pub enum ProgramPoint {
     ElseGuard(BooleanExpr),
     EndIf,
     WhileGuard(BooleanExpr),
-    EndWhile,
+    EndWhile(BooleanExpr),
 }
 
 impl fmt::Display for ProgramPoint {
@@ -18,7 +18,7 @@ impl fmt::Display for ProgramPoint {
             ProgramPoint::ElseGuard(b) => write!(f, "[else-guard] {}", b),
             ProgramPoint::EndIf => write!(f, "[end-if]"),
             ProgramPoint::WhileGuard(b) => write!(f, "[while-guard] {}", b),
-            ProgramPoint::EndWhile => write!(f, "[end-while]"),
+            ProgramPoint::EndWhile(b) => write!(f, "[end-while] {}", b),
         }
     }
 }
@@ -41,9 +41,9 @@ pub fn get_program_points(stmt: Statement) -> Vec<ProgramPoint> {
         ]),
 
         While { cond, body } => concat(vec![
-            vec![WhileGuard(*cond)],
+            vec![WhileGuard(*cond.clone())],
             get_program_points(*body),
-            vec![EndWhile],
+            vec![EndWhile(negate_bexpr(&cond))],
         ]),
     }
 }

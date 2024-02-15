@@ -10,6 +10,8 @@ use std::{
     str::FromStr,
 };
 
+use super::expression_tree::ExpressionTree;
+
 pub static mut LOWER_BOUND: Integer = Integer::NegInf;
 pub static mut UPPER_BOUND: Integer = Integer::PosInf;
 
@@ -82,8 +84,8 @@ impl Domain for Interval {
     fn eval_specific_bexpr(cmp_expr: &BooleanExpr, state: &State<Self>) -> State<Self> {
         match cmp_expr {
             BooleanExpr::NumEq(a1, a2) => {
-                let (ltree, _) = Self::build_expression_tree(a1, state);
-                let (rtree, _) = Self::build_expression_tree(a2, state);
+                let (ltree, _) = ExpressionTree::build(a1, state);
+                let (rtree, _) = ExpressionTree::build(a2, state);
                 let (i1, i2) = (ltree.get_value(), rtree.get_value());
 
                 match i1.intersection(&i2) {
@@ -101,8 +103,8 @@ impl Domain for Interval {
             }
 
             BooleanExpr::NumLt(a1, a2) => {
-                let (ltree, _) = Self::build_expression_tree(a1, state);
-                let (rtree, _) = Self::build_expression_tree(a2, state);
+                let (ltree, _) = ExpressionTree::build(a1, state);
+                let (rtree, _) = ExpressionTree::build(a2, state);
                 let (i1, i2) = (ltree.get_value(), rtree.get_value());
 
                 let one = Integer::Value(1);

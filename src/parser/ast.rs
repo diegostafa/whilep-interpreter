@@ -55,8 +55,8 @@ pub enum BooleanExpr {
     NumGtEq(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
 }
 
-pub fn desugar_not_bexpr(expr: BooleanExpr) -> BooleanExpr {
-    match expr {
+pub fn negate_bexpr(expr: &BooleanExpr) -> BooleanExpr {
+    match expr.clone() {
         BooleanExpr::True => BooleanExpr::False,
         BooleanExpr::False => BooleanExpr::True,
         BooleanExpr::Not(b) => *b,
@@ -75,10 +75,6 @@ pub fn desugar_not_bexpr(expr: BooleanExpr) -> BooleanExpr {
         BooleanExpr::NumLtEq(a1, a2) => BooleanExpr::NumGt(a1, a2),
         BooleanExpr::NumGtEq(a1, a2) => BooleanExpr::NumLt(a1, a2),
     }
-}
-
-pub fn negate_bexpr(expr: &BooleanExpr) -> BooleanExpr {
-    BooleanExpr::Not(Box::new(expr.clone()))
 }
 
 impl fmt::Display for Statement {

@@ -48,7 +48,7 @@ pub fn eval_bexpr(expr: &BooleanExpr, state: &State) -> (bool, State) {
     match expr {
         BooleanExpr::True => (true, state.clone()),
         BooleanExpr::False => (false, state.clone()),
-        BooleanExpr::Not(b) => eval_bexpr(&desugar_not_bexpr(*b.clone()), state),
+        BooleanExpr::Not(b) => eval_bexpr(&negate_bexpr(b), state),
         BooleanExpr::And(b1, b2) => binop_bexpr(|a, b| a && b, b1, b2, state),
         BooleanExpr::Or(b1, b2) => binop_bexpr(|a, b| a || b, b1, b2, state),
         BooleanExpr::NumEq(a1, a2) => binop_cmp(|a, b| a == b, a1, a2, state),
