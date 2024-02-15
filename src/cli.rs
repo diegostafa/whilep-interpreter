@@ -12,19 +12,13 @@ pub struct ProgramOptions {
     pub eval: bool,
 
     #[clap(long, action)]
-    pub check: bool,
+    pub check_interval: bool,
 
     #[clap(long, action)]
-    pub interval: bool,
+    pub check_constant: bool,
 
-    #[clap(long, action)]
-    pub constant: bool,
-
-    #[arg(short = 'M', long, allow_hyphen_values = true)]
-    pub min: Option<i32>,
-
-    #[arg(short = 'N', long, allow_hyphen_values = true)]
-    pub max: Option<i32>,
+    #[arg(short = 'b', long)]
+    pub bounds: Option<String>,
 }
 
 pub fn parse_options() -> ProgramOptions {

@@ -17,6 +17,7 @@ pub enum Constant {
 impl Lattice for Constant {
     const TOP: Self = Constant::Any;
     const BOT: Self = Constant::None;
+    const UNIT: Self = Constant::Value(Integer::Value(1));
 
     fn union(&self, other: &Self) -> Self {
         match (self, other) {
@@ -46,37 +47,16 @@ impl Lattice for Constant {
 }
 
 impl Domain for Constant {
-    fn eval_aexpr(expr: &ArithmeticExpr, state: &State<Self>) -> (Self, State<Self>) {
+    fn eval_specific_aexpr(expr: &ArithmeticExpr, state: &State<Self>) -> (Self, State<Self>) {
         match expr {
             ArithmeticExpr::Number(c) => (Constant::Value(*c), state.clone()),
             ArithmeticExpr::Interval(_, _) => (Constant::Any, state.clone()),
-            ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
-            ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
-            ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
-            ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
-            ArithmeticExpr::Div(a1, a2) => binop_aexpr(|a, b| a / b, a1, a2, state),
-            ArithmeticExpr::PostIncrement(var) => {
-                let val = state.read(var);
-                (val, state.put(var, Constant::Any))
-            }
-            ArithmeticExpr::PostDecrement(var) => {
-                let val = state.read(var);
-                (val, state.put(var, Constant::Any))
-            }
+            _ => unreachable!(),
         }
     }
 
-    fn eval_bexpr(expr: &BooleanExpr, state: &State<Self>) -> State<Self> {
+    fn eval_specific_bexpr(expr: &BooleanExpr, state: &State<Self>) -> State<Self> {
         match expr {
-            BooleanExpr::True => state.clone(),
-            BooleanExpr::False => State::Bottom,
-            BooleanExpr::Not(b) => Self::eval_bexpr(&desugar_not_bexpr(*b.clone()), state),
-            BooleanExpr::And(b1, b2) => {
-                Self::eval_bexpr(b1, state).intersection(&Self::eval_bexpr(b2, state))
-            }
-            BooleanExpr::Or(b1, b2) => {
-                Self::eval_bexpr(b1, state).union(&Self::eval_bexpr(b2, state))
-            }
             BooleanExpr::NumEq(a1, a2) => {
                 let (ltree, new_state) = Self::build_expression_tree(a1, state);
                 let (rtree, new_state) = Self::build_expression_tree(a2, &new_state);
@@ -90,20 +70,9 @@ impl Domain for Constant {
                 }
             }
             BooleanExpr::NumNotEq(a1, a2) => binop_cmp(|a, b| a != b, a1, a2, state),
-
             BooleanExpr::NumLt(a1, a2) => binop_cmp(|a, b| a < b, a1, a2, state),
 
-            BooleanExpr::NumLtEq(a1, a2) => {
-                let lt = Self::eval_bexpr(&BooleanExpr::NumLt(a1.clone(), a2.clone()), state);
-                let eq = Self::eval_bexpr(&BooleanExpr::NumEq(a1.clone(), a2.clone()), state);
-                lt.union(&eq)
-            }
-            BooleanExpr::NumGt(a1, a2) => {
-                Self::eval_bexpr(&BooleanExpr::NumLt(a2.clone(), a1.clone()), state)
-            }
-            BooleanExpr::NumGtEq(a1, a2) => {
-                Self::eval_bexpr(&BooleanExpr::NumLtEq(a2.clone(), a1.clone()), state)
-            }
+            _ => unreachable!(),
         }
     }
 }
@@ -174,6 +143,7 @@ impl ops::Div<Constant> for Constant {
             (Constant::None, _) | (_, Constant::None) => Constant::None,
             (Constant::Any, _) | (_, Constant::Any) => Constant::Any,
             (Constant::Value(_), Constant::Value(b)) if b == zero => Constant::None,
+            (Constant::Value(a), Constant::Value(_)) if a == zero => Constant::Value(zero),
             (Constant::Value(a), Constant::Value(b)) => Constant::Value(a / b),
         }
     }

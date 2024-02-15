@@ -34,12 +34,12 @@ pub enum ArithmeticExpr {
     Number(Integer),
     Interval(Integer, Integer),
     Identifier(String),
-    PostIncrement(String),
-    PostDecrement(String),
     Add(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Sub(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Mul(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Div(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
+    PostIncrement(String),
+    PostDecrement(String),
 }
 
 #[derive(Debug, Clone)]
@@ -101,12 +101,12 @@ impl fmt::Display for ArithmeticExpr {
             ArithmeticExpr::Number(n) => write!(f, "{}", n),
             ArithmeticExpr::Interval(a, b) => write!(f, "[{}, {}]", a, b),
             ArithmeticExpr::Identifier(s) => write!(f, "{}", s),
-            ArithmeticExpr::PostIncrement(s) => write!(f, "{}++", s),
-            ArithmeticExpr::PostDecrement(s) => write!(f, "{}--", s),
             ArithmeticExpr::Add(a, b) => write!(f, "({} + {})", a, b),
             ArithmeticExpr::Sub(a, b) => write!(f, "({} - {})", a, b),
             ArithmeticExpr::Mul(a, b) => write!(f, "({} * {})", a, b),
             ArithmeticExpr::Div(a, b) => write!(f, "({} / {})", a, b),
+            ArithmeticExpr::PostIncrement(s) => write!(f, "{}++", s),
+            ArithmeticExpr::PostDecrement(s) => write!(f, "{}--", s),
         }
     }
 }

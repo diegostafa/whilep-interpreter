@@ -36,6 +36,6 @@ impl StateOperations for State {
             .collect::<Vec<String>>();
 
         pretty_state.sort();
-        println!("\t {}", pretty_state.join(", "));
+        println!("{}", pretty_state.join(", "));
     }
 }

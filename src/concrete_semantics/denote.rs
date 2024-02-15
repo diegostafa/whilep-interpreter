@@ -24,6 +24,42 @@ pub fn denote_stmt(stmt: Statement) -> StateFunction {
     }
 }
 
+pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> (Integer, State) {
+    match expr {
+        ArithmeticExpr::Number(n) => (*n, state.clone()),
+        ArithmeticExpr::Interval(n, m) => (random_integer_between(*n, *m), state.clone()),
+        ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
+        ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
+        ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
+        ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
+        ArithmeticExpr::Div(a1, a2) => binop_aexpr(|a, b| a / b, a1, a2, state),
+        ArithmeticExpr::PostIncrement(var) => {
+            let val = state.read(var);
+            (val, state.put(var, val + 1))
+        }
+        ArithmeticExpr::PostDecrement(var) => {
+            let val = state.read(var);
+            (val, state.put(var, val - 1))
+        }
+    }
+}
+
+pub fn eval_bexpr(expr: &BooleanExpr, state: &State) -> (bool, State) {
+    match expr {
+        BooleanExpr::True => (true, state.clone()),
+        BooleanExpr::False => (false, state.clone()),
+        BooleanExpr::Not(b) => eval_bexpr(&desugar_not_bexpr(*b.clone()), state),
+        BooleanExpr::And(b1, b2) => binop_bexpr(|a, b| a && b, b1, b2, state),
+        BooleanExpr::Or(b1, b2) => binop_bexpr(|a, b| a || b, b1, b2, state),
+        BooleanExpr::NumEq(a1, a2) => binop_cmp(|a, b| a == b, a1, a2, state),
+        BooleanExpr::NumNotEq(a1, a2) => binop_cmp(|a, b| a != b, a1, a2, state),
+        BooleanExpr::NumLt(a1, a2) => binop_cmp(|a, b| a < b, a1, a2, state),
+        BooleanExpr::NumGt(a1, a2) => binop_cmp(|a, b| a > b, a1, a2, state),
+        BooleanExpr::NumLtEq(a1, a2) => binop_cmp(|a, b| a <= b, a1, a2, state),
+        BooleanExpr::NumGtEq(a1, a2) => binop_cmp(|a, b| a >= b, a1, a2, state),
+    }
+}
+
 // --- semantic functions
 
 fn bottom() -> StateFunction {
@@ -66,42 +102,6 @@ fn lfp(f: Functional) -> StateFunction {
             }
         }
     })
-}
-
-pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> (Integer, State) {
-    match expr {
-        ArithmeticExpr::Number(n) => (*n, state.clone()),
-        ArithmeticExpr::Interval(n, m) => (random_integer_between(*n, *m), state.clone()),
-        ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
-        ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
-        ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
-        ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
-        ArithmeticExpr::Div(a1, a2) => binop_aexpr(|a, b| a / b, a1, a2, state),
-        ArithmeticExpr::PostIncrement(var) => {
-            let val = state.read(var);
-            (val, state.put(var, val + 1))
-        }
-        ArithmeticExpr::PostDecrement(var) => {
-            let val = state.read(var);
-            (val, state.put(var, val - 1))
-        }
-    }
-}
-
-pub fn eval_bexpr(expr: &BooleanExpr, state: &State) -> (bool, State) {
-    match expr {
-        BooleanExpr::True => (true, state.clone()),
-        BooleanExpr::False => (false, state.clone()),
-        BooleanExpr::Not(b) => eval_bexpr(&desugar_not_bexpr(*b.clone()), state),
-        BooleanExpr::And(b1, b2) => binop_bexpr(|a, b| a && b, b1, b2, state),
-        BooleanExpr::Or(b1, b2) => binop_bexpr(|a, b| a || b, b1, b2, state),
-        BooleanExpr::NumEq(a1, a2) => binop_cmp(|a, b| a == b, a1, a2, state),
-        BooleanExpr::NumNotEq(a1, a2) => binop_cmp(|a, b| a != b, a1, a2, state),
-        BooleanExpr::NumLt(a1, a2) => binop_cmp(|a, b| a < b, a1, a2, state),
-        BooleanExpr::NumGt(a1, a2) => binop_cmp(|a, b| a > b, a1, a2, state),
-        BooleanExpr::NumLtEq(a1, a2) => binop_cmp(|a, b| a <= b, a1, a2, state),
-        BooleanExpr::NumGtEq(a1, a2) => binop_cmp(|a, b| a >= b, a1, a2, state),
-    }
 }
 
 // --- helpers
