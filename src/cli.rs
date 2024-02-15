@@ -5,19 +5,36 @@ use cli_tables::Table;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct ProgramOptions {
-    #[arg(short, long = "source-file", required = true)]
+    #[arg(
+        short,
+        long = "source-file",
+        required = true,
+        help = "Path to the source file"
+    )]
     pub source_file: String,
 
-    #[clap(long, action)]
+    #[clap(long, action, help = "Perform a concrete evaluation")]
     pub eval: bool,
 
-    #[clap(long, action)]
+    #[clap(
+        long,
+        action,
+        help = "Perform an abstract evaluation on the interval domain"
+    )]
     pub check_interval: bool,
 
-    #[clap(long, action)]
+    #[clap(
+        long,
+        action,
+        help = "Perform an abstract evaluation on the constant domain"
+    )]
     pub check_constant: bool,
 
-    #[arg(short = 'b', long)]
+    #[arg(
+        short = 'b',
+        long,
+        help = "Set the lower and upper bounds for the interval domain"
+    )]
     pub bounds: Option<String>,
 }
 

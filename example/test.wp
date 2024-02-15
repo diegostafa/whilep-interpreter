@@ -1,3 +1,10 @@
-x:=10;
+x := 100;
+y := 22;
 
-while (x >= 0) do x-- done
+while (x >= 0) do
+    if (x <= y) then
+        while (x >= 10) do x-- done
+    else
+        y++
+    end
+done

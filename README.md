@@ -2,6 +2,20 @@
 
 An interpreter for the concrete and abstract semantics of the While+ programming language
 
+## Usage
+
+```
+Usage: whilep [OPTIONS] --source-file <SOURCE_FILE>
+
+Options:
+  -s, --source-file <SOURCE_FILE>  Path to the source file
+      --eval                       Perform a concrete evaluation
+      --check-interval             Perform an abstract evaluation on the interval domain
+      --check-constant             Perform an abstract evaluation on the constant domain
+  -b, --bounds <BOUNDS>            Set the lower and upper bounds for the interval domain
+  -h, --help                       Print help
+  -V, --version                    Print version
+  ```
 
 ## Example
 
