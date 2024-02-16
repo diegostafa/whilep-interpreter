@@ -72,11 +72,14 @@ impl Domain for Constant {
             BooleanExpr::NumLt(a1, a2) => {
                 let (lhs, new_state) = Self::eval_aexpr(a1, &state);
                 let (rhs, new_state) = Self::eval_aexpr(a2, &new_state);
-                match lhs < rhs {
-                    true => new_state,
+                match (lhs, rhs) {
+                    (Constant::None, _) | (_, Constant::None) => State::Bottom,
+                    (Constant::Any, _) | (_, Constant::Any) => new_state,
+                    (Constant::Value(l), Constant::Value(r)) if l < r => new_state,
                     _ => State::Bottom,
                 }
             }
+
             _ => unreachable!(),
         }
     }

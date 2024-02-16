@@ -124,7 +124,7 @@ impl<T: Domain> fmt::Display for State<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             State::Bottom => write!(f, "BOTTOM STATE"),
-            State::Just(s) if s.is_empty() => write!(f, "-"),
+            State::Just(s) if s.is_empty() => write!(f, "EMPTY STATE"),
             State::Just(s) => {
                 let mut pretty_state = s
                     .iter()

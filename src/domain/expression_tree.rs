@@ -43,7 +43,6 @@ impl<T: Domain> ExpressionTree<T> {
             | ArithmeticExpr::Div(a1, a2) => {
                 let (l, new_state) = Self::build(a1, &new_state);
                 let (r, new_state) = Self::build(a2, &new_state);
-
                 (
                     ExpressionTree::Binop(expr.clone(), val, Box::new(l), Box::new(r)),
                     new_state,

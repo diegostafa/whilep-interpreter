@@ -9,9 +9,6 @@ use crate::parser::ast::*;
 pub type StateFunction<'a, T> =
     Box<dyn Fn((State<T>, Invariant<T>)) -> (State<T>, Invariant<T>) + 'a>;
 
-pub type StateTransformer<'a, T> =
-    Box<dyn Fn(&State<T>) -> (State<T>, Vec<State<T>>, State<T>) + 'a>;
-
 // --- ast denotation
 
 pub fn denote_stmt<'a, T: Domain + 'a>(stmt: Statement) -> StateFunction<'a, T> {
@@ -20,7 +17,7 @@ pub fn denote_stmt<'a, T: Domain + 'a>(stmt: Statement) -> StateFunction<'a, T> 
         Statement::Chain(s1, s2) => compose(denote_stmt(*s1), denote_stmt(*s2)),
         Statement::Assignment { var, val } => state_update(var, *val),
         Statement::If { cond, s1, s2 } => conditional(*cond, denote_stmt(*s1), denote_stmt(*s2)),
-        Statement::While { cond, body } => lfp(*cond, denote_stmt(*body)),
+        Statement::While { cond, body } => fix(*cond, denote_stmt(*body)),
     }
 }
 
@@ -53,10 +50,8 @@ fn conditional<'a, T: Domain + 'a>(
     Box::new(move |(state, inv)| {
         let if_cond_state = T::eval_bexpr(&cond, &state);
         let el_cond_state = T::eval_bexpr(&negate_bexpr(&cond), &state);
-
         let (s1_state, s1_inv) = s1((if_cond_state.clone(), Invariant::new()));
         let (s2_state, s2_inv) = s2((el_cond_state.clone(), Invariant::new()));
-
         let end_state = s1_state.union(&s2_state);
         (
             end_state.clone(),
@@ -71,33 +66,36 @@ fn conditional<'a, T: Domain + 'a>(
     })
 }
 
-fn lfp<'a, T: Domain + 'a>(cond: BooleanExpr, body: StateFunction<'a, T>) -> StateFunction<'a, T> {
+pub type StateTransformer<'a, T> =
+    Box<dyn Fn(&State<T>) -> (State<T>, Vec<State<T>>, State<T>) + 'a>;
+
+fn fix<'a, T: Domain + 'a>(cond: BooleanExpr, body: StateFunction<'a, T>) -> StateFunction<'a, T> {
     Box::new(move |(state, inv)| {
-        let iteration = Box::new(|s: &State<T>| {
-            let cond_state = T::eval_bexpr(&cond, &s);
+        let iteration = Box::new(|prev_state: &State<T>| {
+            let cond_state = T::eval_bexpr(&cond, &prev_state);
             let (body_state, body_inv) = body((cond_state.clone(), Invariant::new()));
-            let done_state = state.widen(&body_state);
-            (cond_state, body_inv, done_state)
+            let exit_state = state.widen(&body_state);
+            (cond_state, body_inv, exit_state)
         });
 
-        let fix = |f: StateTransformer<T>| {
+        let lfp = |f: StateTransformer<T>| {
             let mut prev_state = State::Bottom;
             loop {
-                let (cond_state, body_inv, done_state) = f(&prev_state);
-                match prev_state == done_state {
-                    true => break (cond_state, body_inv, done_state),
-                    _ => prev_state = done_state,
+                let (cond_state, body_inv, exit_state) = f(&prev_state);
+                match prev_state == exit_state {
+                    true => break (cond_state, body_inv, exit_state),
+                    _ => prev_state = exit_state,
                 }
             }
         };
 
-        let (cond_state, body_inv, done_state) = fix(iteration);
-        let done_state_narrowed = done_state.narrow(&body_inv.back());
-        let end_state = T::eval_bexpr(&negate_bexpr(&cond), &done_state_narrowed);
+        let (cond_state, body_inv, exit_state) = lfp(iteration);
+        let exit_state = exit_state.narrow(&body_inv.back());
+        let exit_state = T::eval_bexpr(&negate_bexpr(&cond), &exit_state);
 
         (
-            end_state.clone(),
-            inv.concat(&[vec![cond_state], body_inv, vec![end_state]]),
+            exit_state.clone(),
+            inv.concat(&[vec![cond_state], body_inv, vec![exit_state]]),
         )
     })
 }

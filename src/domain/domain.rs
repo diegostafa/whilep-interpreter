@@ -12,7 +12,7 @@ trait_set! {
 
 pub trait Domain: DomainProperties {
     fn eval_specific_aexpr(expr: &ArithmeticExpr, state: &State<Self>) -> (Self, State<Self>);
-    fn eval_specific_bexpr(cmp_expr: &BooleanExpr, state: &State<Self>) -> State<Self>;
+    fn eval_specific_bexpr(expr: &BooleanExpr, state: &State<Self>) -> State<Self>;
 
     fn eval_aexpr(expr: &ArithmeticExpr, state: &State<Self>) -> (Self, State<Self>) {
         match expr {
