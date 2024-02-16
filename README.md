@@ -4,7 +4,7 @@ An interpreter for the concrete and abstract semantics of the While+ programming
 
 ## Language
 
-catgories:
+categories:
 * *n* : Integer
 * *range* : Interval
 * *x* : Variable
@@ -51,25 +51,43 @@ Options:
   -h, --help                       Print help
   -V, --version                    Print version
   ```
+## Build and run
 
-## Example
-
-```
-x := 10; y := 0;
-while (x >= 0) do x--; y++ done
+```sh
+cargo run -- -s example/test.wp --check-interval --check-constant --eval
 ```
 
 output:
 ```
-+---+------------------------+--------------+
-| # | Program point          | Invariant    |
-+---+------------------------+--------------+
-| 0 | x := 10                | x: 10        |
-| 1 | y := 7                 | x: 10, y: 7  |
-| 2 | [while-guard] (x >= 0) | x: Any, y: 7 |
-| 3 | x := (x - 1)           | x: Any, y: 7 |
-| 4 | y := (y + 1)           | x: Any, y: 8 |
-| 5 | y := (y - 1)           | x: Any, y: 7 |
-| 6 | [end-while] (x < 0)    | x: Any, y: 7 |
-+---+------------------------+--------------+
+[INFO] evaluating the abstract semantics in the Interval domain
++---+--------------------------+-------------------+
+| # | Program point            | Invariant         |
++---+--------------------------+-------------------+
+| 0 | x := 10                  | x: [10]           |
+| 1 | y := 7                   | x: [10], y: [7]   |
+| 2 | [while-guard] (x-- >= 0) | x: [-1,9], y: [7] |
+| 3 | y := (y + 1)             | x: [-1,9], y: [8] |
+| 4 | y := (y - 1)             | x: [-1,9], y: [7] |
+| 5 | [end-while] (x-- < 0)    | x: [-2], y: [7]   |
++---+--------------------------+-------------------+
+
+[INFO] evaluating the abstract semantics in the Constant domain
++---+--------------------------+--------------+
+| # | Program point            | Invariant    |
++---+--------------------------+--------------+
+| 0 | x := 10                  | x: 10        |
+| 1 | y := 7                   | x: 10, y: 7  |
+| 2 | [while-guard] (x-- >= 0) | x: Any, y: 7 |
+| 3 | y := (y + 1)             | x: Any, y: 8 |
+| 4 | y := (y - 1)             | x: Any, y: 7 |
+| 5 | [end-while] (x-- < 0)    | x: Any, y: 7 |
++---+--------------------------+--------------+
+
+[INFO] evaluating the concrete semantics
++---+-----+-----+
+| # | Var | Val |
++---+-----+-----+
+| 0 | y   | 7   |
+| 1 | x   | -2  |
++---+-----+-----+
 ```

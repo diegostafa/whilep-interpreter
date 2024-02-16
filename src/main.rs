@@ -20,13 +20,11 @@ fn run_concrete(ast: &Statement) {
     use concrete_semantics::denote::*;
     use concrete_semantics::state::*;
 
-    println!("[INFO] building the concrete semantics");
     let induced_function = denote_stmt(ast.clone());
 
-    println!("[INFO] evaluating the concrete semantics");
+    println!("\n[INFO] evaluating the concrete semantics");
     let state = induced_function(State::new());
 
-    println!("[INFO] concrete state");
     let headers = vec!["#".to_string(), "Var".to_string(), "Val".to_string()];
     let rows = state
         .unwrap()
@@ -42,14 +40,15 @@ fn run_abstract<T: Domain>(ast: &Statement) {
     use abstract_semantics::denote::*;
     use abstract_semantics::state::*;
 
-    println!("[INFO] building the abstract semantics");
     let induced_function: StateFunction<T> = denote_stmt(ast.clone());
 
-    println!("[INFO] evaluating the abstract semantics");
+    println!(
+        "\n[INFO] evaluating the abstract semantics in the {} domain",
+        std::any::type_name::<T>().split("::").last().unwrap()
+    );
     let (_, inv) = induced_function((State::new(), Invariant::new()));
     let points = get_program_points(ast.clone());
 
-    println!("[INFO] invariants");
     let headers = vec![
         "#".to_string(),
         "Program point".to_string(),
