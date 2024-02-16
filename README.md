@@ -1,6 +1,41 @@
-## Whilep
+# Whilep
 
 An interpreter for the concrete and abstract semantics of the While+ programming language
+
+## Language
+
+catgories:
+* *n* : Integer
+* *range* : Interval
+* *x* : Variable
+* *a* : Arithmetic expression
+* *b* : Boolean expression
+
+grammar:
+```antlr
+S ::= skip
+    | x := a | x op= a | x++ | x--
+    | if b then S else S end
+    | while b do S done
+    | repeat S until b
+    | for x in range do S done
+
+a ::= n
+    | range
+    | x
+    | (a op a)
+    | x++ | x--
+
+b ::= true
+    | false
+    | ! b
+    | (b logic b)
+    | (a compare a)
+
+op      ::= + | - | * | /
+logic   ::= && | ||
+compare ::= == | != | < | > | <= | >=
+```
 
 ## Usage
 
@@ -19,35 +54,22 @@ Options:
 
 ## Example
 
-input:
 ```
-x := 100;
-y := 22;
-
-while (x >= 0) do
-    if (x <= y) then
-        while (x >= 10) do x-- done
-    else
-        y++
-    end
-done
+x := 10; y := 0;
+while (x >= 0) do x--; y++ done
 ```
 
 output:
 ```
-+----+-------------------------+-------------------------------+
-| #  | Program point           | Invariant                     |
-+----+-------------------------+-------------------------------+
-| 0  | x := 100                | x: [100]                      |
-| 1  | y := 22                 | x: [100], y: [22]             |
-| 2  | [while-guard] (x >= 0)  | x: [0, 100], y: [22, posinf]  |
-| 3  | [if-guard] (x <= y)     | x: [0, 100], y: [22, posinf]  |
-| 4  | [while-guard] (x >= 10) | x: [10, 100], y: [22, posinf] |
-| 5  | x := (x - 1)            | x: [9, 99], y: [22, posinf]   |
-| 6  | [end-while]             | x: [0, 9], y: [22, posinf]    |
-| 7  | [else-guard] !(x <= y)  | x: [23, 100], y: [22, 99]     |
-| 8  | y := (y + 1)            | x: [23, 100], y: [23, 100]    |
-| 9  | [end-if]                | x: [0, 100], y: [22, posinf]  |
-| 10 | [end-while]             | BOTTOM STATE                  |
-+----+-------------------------+-------------------------------+
++---+------------------------+--------------+
+| # | Program point          | Invariant    |
++---+------------------------+--------------+
+| 0 | x := 10                | x: 10        |
+| 1 | y := 7                 | x: 10, y: 7  |
+| 2 | [while-guard] (x >= 0) | x: Any, y: 7 |
+| 3 | x := (x - 1)           | x: Any, y: 7 |
+| 4 | y := (y + 1)           | x: Any, y: 8 |
+| 5 | y := (y - 1)           | x: Any, y: 7 |
+| 6 | [end-while] (x < 0)    | x: Any, y: 7 |
++---+------------------------+--------------+
 ```
