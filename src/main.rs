@@ -1,4 +1,3 @@
-use crate::abstract_semantics::invariant::*;
 use crate::domain::constant::*;
 use crate::domain::domain::*;
 use crate::domain::interval::*;
@@ -46,7 +45,7 @@ fn run_abstract<T: Domain>(ast: &Statement) {
         "\n[INFO] evaluating the abstract semantics in the {} domain",
         std::any::type_name::<T>().split("::").last().unwrap()
     );
-    let (_, inv) = induced_function((State::new(), Invariant::new()));
+    let (_, inv) = induced_function(State::new());
     let points = get_program_points(ast.clone());
 
     let headers = vec![
