@@ -95,7 +95,7 @@ fn fix<'a, T: Domain + 'a>(cond: BooleanExpr, body: StateFunction<'a, T>) -> Sta
 
         let exit_state = match body_inv.back() {
             State::Bottom => exit_state,
-            _ => exit_state.narrow(&body_inv.back()),
+            s => exit_state.narrow(&s),
         };
 
         let exit_state = T::eval_bexpr(&negate_bexpr(&cond), &exit_state);
