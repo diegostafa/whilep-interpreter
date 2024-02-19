@@ -18,7 +18,8 @@ pub fn denote_stmt<'a, T: Domain + 'a>(stmt: Statement) -> StateFunction<'a, T> 
         Statement::Chain(s1, s2) => compose(denote_stmt(*s1), denote_stmt(*s2)),
         Statement::Assignment { var, val } => state_update(var, *val),
         Statement::If { cond, s1, s2 } => conditional(*cond, denote_stmt(*s1), denote_stmt(*s2)),
-        Statement::While { cond, body } => fix(*cond, denote_stmt(*body)),
+        Statement::While { cond, body } => fix_while(*cond, denote_stmt(*body)),
+        Statement::RepeatUntil { body, cond } => fix_repeat(*cond, denote_stmt(*body)),
     }
 }
 
@@ -71,7 +72,10 @@ fn conditional<'a, T: Domain + 'a>(
     })
 }
 
-fn fix<'a, T: Domain + 'a>(cond: BooleanExpr, body: StateFunction<'a, T>) -> StateFunction<'a, T> {
+fn fix_while<'a, T: Domain + 'a>(
+    cond: BooleanExpr,
+    body: StateFunction<'a, T>,
+) -> StateFunction<'a, T> {
     Box::new(move |state| {
         let iteration = Box::new(|prev_state: &State<T>| {
             let cond_state = T::eval_bexpr(&cond, &prev_state);
@@ -102,6 +106,53 @@ fn fix<'a, T: Domain + 'a>(cond: BooleanExpr, body: StateFunction<'a, T>) -> Sta
         (
             exit_state.clone(),
             concat(&[vec![cond_state], body_inv, vec![exit_state]]),
+        )
+    })
+}
+
+fn fix_repeat<'a, T: Domain + 'a>(
+    cond: BooleanExpr,
+    body: StateFunction<'a, T>,
+) -> StateFunction<'a, T> {
+    Box::new(move |state| {
+        let one_step_state = body(state.clone()).0;
+
+        let iteration = Box::new(|prev_state: &State<T>| {
+            let cond_state = T::eval_bexpr(&negate_bexpr(&cond), &prev_state);
+            let (body_state, body_inv) = body(cond_state.clone());
+            let cond_state = T::eval_bexpr(&negate_bexpr(&cond), &body_state);
+            let exit_state = one_step_state.widen(&body_state);
+            (cond_state, body_inv, exit_state)
+        });
+
+        let lfp = |f: StateTransformer<T>| {
+            let mut prev_state = State::Bottom;
+
+            loop {
+                let (cond_state, body_inv, exit_state) = f(&prev_state);
+                match prev_state == exit_state {
+                    true => break (cond_state, body_inv, exit_state),
+                    _ => prev_state = exit_state,
+                }
+            }
+        };
+
+        let (cond_state, body_inv, exit_state) = lfp(iteration);
+
+        let exit_state = match body_inv.back() {
+            State::Bottom => one_step_state.clone(),
+            s => exit_state.narrow(&s),
+        };
+
+        let exit_state = T::eval_bexpr(&cond, &exit_state);
+        (
+            exit_state.clone(),
+            concat(&[
+                vec![one_step_state],
+                body_inv,
+                vec![cond_state],
+                vec![exit_state],
+            ]),
         )
     })
 }

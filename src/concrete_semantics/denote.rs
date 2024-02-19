@@ -19,7 +19,16 @@ pub fn denote_stmt(stmt: Statement) -> StateFunction {
             let f = Box::new(move |g| {
                 conditional(*cond.clone(), compose(denote_stmt(*body.clone()), g), id())
             });
-            lfp(f)
+            fix(f)
+        }
+        Statement::RepeatUntil { body, cond } => {
+            let f = Box::new(move |g| {
+                compose(
+                    denote_stmt(*body.clone()),
+                    conditional(*cond.clone(), id(), g),
+                )
+            });
+            fix(f)
         }
     }
 }
@@ -91,7 +100,7 @@ fn conditional(cond: BooleanExpr, s1: StateFunction, s2: StateFunction) -> State
     })
 }
 
-fn lfp(f: Functional) -> StateFunction {
+fn fix(f: Functional) -> StateFunction {
     Box::new(move |state| {
         let mut g = bottom();
         loop {

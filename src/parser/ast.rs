@@ -25,6 +25,11 @@ pub enum Statement {
         cond: Box<BooleanExpr>,
         body: Box<Statement>,
     },
+
+    RepeatUntil {
+        body: Box<Statement>,
+        cond: Box<BooleanExpr>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -82,9 +87,10 @@ impl fmt::Display for Statement {
         match self {
             Statement::Skip => write!(f, "skip"),
             Statement::Assignment { var, val } => write!(f, "{} := {}", var, val),
+            Statement::Chain(s1, s2) => write!(f, "{}; {}", s1, s2),
             Statement::If { cond, s1, s2 } => write!(f, "if {} then {} else {} end", cond, s1, s2),
             Statement::While { cond, body } => write!(f, "while {} do {} done", cond, body),
-            Statement::Chain(s1, s2) => write!(f, "{}; {}", s1, s2),
+            Statement::RepeatUntil { cond, body } => write!(f, "repeat {} until {}", body, cond),
         }
     }
 }

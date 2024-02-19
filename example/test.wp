@@ -1,2 +1,6 @@
-x := 10; y := 7;
-while (x-- >= 0) do y++; y-- done
+
+x:=10;
+y:=7;
+
+
+repeat x++; y++ until (x>20)

@@ -3,11 +3,17 @@ use std::fmt::{self};
 
 pub enum ProgramPoint {
     Stmt(Statement),
+
     IfGuard(BooleanExpr),
     ElseGuard(BooleanExpr),
     EndIf,
+
     WhileGuard(BooleanExpr),
     EndWhile(BooleanExpr),
+
+    Repeat,
+    UntilGuard(BooleanExpr),
+    EndRepeatUntil(BooleanExpr),
 }
 
 impl fmt::Display for ProgramPoint {
@@ -19,6 +25,9 @@ impl fmt::Display for ProgramPoint {
             ProgramPoint::EndIf => write!(f, "[end-if]"),
             ProgramPoint::WhileGuard(b) => write!(f, "[while-guard] {}", b),
             ProgramPoint::EndWhile(b) => write!(f, "[end-while] {}", b),
+            ProgramPoint::Repeat => write!(f, "[repeat]"),
+            ProgramPoint::UntilGuard(b) => write!(f, "[until-guard] {}", b),
+            ProgramPoint::EndRepeatUntil(b) => write!(f, "[end-repeat] {}", b),
         }
     }
 }
@@ -44,6 +53,13 @@ pub fn get_program_points(stmt: Statement) -> Vec<ProgramPoint> {
             vec![WhileGuard(*cond.clone())],
             get_program_points(*body),
             vec![EndWhile(negate_bexpr(&cond))],
+        ]),
+
+        RepeatUntil { body, cond } => concat(vec![
+            vec![Repeat],
+            get_program_points(*body),
+            vec![UntilGuard(negate_bexpr(&cond))],
+            vec![EndRepeatUntil(*cond.clone())],
         ]),
     }
 }

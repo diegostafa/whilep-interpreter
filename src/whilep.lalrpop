@@ -29,13 +29,7 @@ TerminalStmt: Statement =
     "if" <b:BExpr> "then" <s1:Stmt> "else" <s2:Stmt> "end"  => Statement::If{cond:Box::new(b), s1: Box::new(s1), s2: Box::new(s2)},
 
     "while" <b:BExpr> "do" <s:Stmt> "done" => Statement::While{cond: Box::new(b), body: Box::new(s)},
-
-    "repeat" <s:Stmt> "until" <b:BExpr>
-        => Statement::Chain(
-            Box::new(s.clone()),
-            Box::new(Statement::While{
-                cond: Box::new(BooleanExpr::Not(Box::new(b))),
-                body: Box::new(s.clone())})),
+    "repeat" <s:Stmt> "until" <b:BExpr> => Statement::RepeatUntil{cond: Box::new(b), body: Box::new(s)},
 
     "for" <x:Identifier> "in"  "[" <from:Number> ","  <to:Number> "]" "do" <s:Stmt> "done"
         => Statement::Chain(
