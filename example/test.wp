@@ -1,6 +1,3 @@
 
-x:=10;
-y:=7;
-
-
-repeat x++; y++ until (x>20)
+x := 0;
+if ((x+1) != (1+x)) then z:=1 else s:= 2 end

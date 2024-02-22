@@ -7,6 +7,19 @@ use crate::types::integer::*;
 type StateFunction = Box<dyn Fn(State) -> Option<State>>;
 type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
 
+trait FunctionMethods {
+    fn compose_many(&self, n: i32, input: StateFunction) -> StateFunction;
+}
+
+impl FunctionMethods for Functional {
+    fn compose_many(&self, n: i32, input: StateFunction) -> StateFunction {
+        match n {
+            0 => input,
+            _ => self.compose_many(n - 1, self(input)),
+        }
+    }
+}
+
 // --- ast denotation
 
 pub fn denote_stmt(stmt: Statement) -> StateFunction {
@@ -106,6 +119,21 @@ fn fix(f: Functional) -> StateFunction {
         loop {
             g = f(g);
             let final_state = g(state.clone());
+            if final_state.is_some() {
+                return final_state;
+            }
+        }
+    })
+}
+
+// alternative implementation
+fn _fix(f: Functional) -> StateFunction {
+    Box::new(move |state| {
+        let mut n = 0;
+        loop {
+            n += 1;
+            let f = f.compose_many(n, bottom());
+            let final_state = f(state.clone());
             if final_state.is_some() {
                 return final_state;
             }

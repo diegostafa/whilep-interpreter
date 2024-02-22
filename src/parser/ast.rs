@@ -129,47 +129,24 @@ impl fmt::Display for BooleanExpr {
     }
 }
 
-pub fn is_same_aexpr(a1: &ArithmeticExpr, a2: &ArithmeticExpr) -> bool {
-    let binop_nodes = |a: ArithmeticExpr| match a {
-        ArithmeticExpr::Add(a1, a2) => (a1, a2),
-        ArithmeticExpr::Sub(a1, a2) => (a1, a2),
-        ArithmeticExpr::Mul(a1, a2) => (a1, a2),
-        ArithmeticExpr::Div(a1, a2) => (a1, a2),
-        _ => unreachable!(),
-    };
+impl PartialEq for ArithmeticExpr {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ArithmeticExpr::Number(a), ArithmeticExpr::Number(b)) => a == b,
 
-    match (a1, a2) {
-        (ArithmeticExpr::Number(a), ArithmeticExpr::Number(b)) => a == b,
-        (ArithmeticExpr::Identifier(a), ArithmeticExpr::Identifier(b)) => a == b,
-        (ArithmeticExpr::PostDecrement(a), ArithmeticExpr::PostDecrement(b)) => a == b,
-        (ArithmeticExpr::PostIncrement(a), ArithmeticExpr::PostIncrement(b)) => a == b,
+            (ArithmeticExpr::Identifier(a), ArithmeticExpr::Identifier(b))
+            | (ArithmeticExpr::PostDecrement(a), ArithmeticExpr::PostDecrement(b))
+            | (ArithmeticExpr::PostIncrement(a), ArithmeticExpr::PostIncrement(b)) => a == b,
 
-        (ArithmeticExpr::Number(_), _)
-        | (_, ArithmeticExpr::Number(_))
-        | (ArithmeticExpr::Identifier(_), _)
-        | (_, ArithmeticExpr::Identifier(_))
-        | (ArithmeticExpr::PostDecrement(_), _)
-        | (_, ArithmeticExpr::PostDecrement(_))
-        | (ArithmeticExpr::PostIncrement(_), _)
-        | (_, ArithmeticExpr::PostIncrement(_))
-        | (ArithmeticExpr::Interval(_, _), _)
-        | (_, ArithmeticExpr::Interval(_, _)) => false,
+            (ArithmeticExpr::Add(a1, a2), ArithmeticExpr::Add(b1, b2))
+            | (ArithmeticExpr::Mul(a1, a2), ArithmeticExpr::Mul(b1, b2)) => {
+                (a1 == b1 && a2 == b2) || (a1 == b2 && a2 == b1)
+            }
 
-        (ArithmeticExpr::Add(_, _), ArithmeticExpr::Add(_, _))
-        | (ArithmeticExpr::Mul(_, _), ArithmeticExpr::Mul(_, _)) => {
-            let (lhs1, lhs2) = binop_nodes(a1.clone());
-            let (rhs1, rhs2) = binop_nodes(a2.clone());
-            (is_same_aexpr(&lhs1, &rhs1) && is_same_aexpr(&lhs2, &rhs2))
-                || (is_same_aexpr(&lhs1, &rhs2) && is_same_aexpr(&lhs2, &rhs1))
+            (ArithmeticExpr::Sub(a1, a2), ArithmeticExpr::Sub(b1, b2))
+            | (ArithmeticExpr::Div(a1, a2), ArithmeticExpr::Div(b1, b2)) => a1 == b1 && a2 == b2,
+
+            _ => false,
         }
-
-        (ArithmeticExpr::Sub(_, _), ArithmeticExpr::Sub(_, _))
-        | (ArithmeticExpr::Div(_, _), ArithmeticExpr::Div(_, _)) => {
-            let (lhs1, lhs2) = binop_nodes(a1.clone());
-            let (rhs1, rhs2) = binop_nodes(a2.clone());
-            is_same_aexpr(&lhs1, &rhs1) && is_same_aexpr(&lhs2, &rhs2)
-        }
-
-        _ => false,
     }
 }

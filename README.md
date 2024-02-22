@@ -28,7 +28,7 @@ a ::= n
 
 b ::= true
     | false
-    | ! b
+    | !b
     | (b logic b)
     | (a compare a)
 

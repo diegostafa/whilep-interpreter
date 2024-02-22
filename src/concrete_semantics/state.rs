@@ -28,6 +28,11 @@ impl StateOperations for State {
     }
 
     fn pretty_print(&self) {
+        if self.is_empty() {
+            println!("empty state");
+            return;
+        }
+
         let mut pretty_state = self
             .iter()
             .map(|(var, val)| format!("{}: {}", var, val))

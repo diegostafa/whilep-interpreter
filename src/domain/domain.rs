@@ -69,7 +69,7 @@ pub trait Domain: DomainProperties {
                 Self::eval_bexpr(&BooleanExpr::NumLtEq(a2.clone(), a1.clone()), state)
             }
 
-            BooleanExpr::NumNotEq(a1, a2) => match is_same_aexpr(a1, a2) {
+            BooleanExpr::NumNotEq(a1, a2) => match a1 == a2 {
                 true => State::Bottom,
                 _ => {
                     let (_, new_state) = Self::eval_aexpr(a1, state);
@@ -80,7 +80,7 @@ pub trait Domain: DomainProperties {
 
             BooleanExpr::NumEq(_, _) => Self::eval_specific_bexpr(expr, state),
 
-            BooleanExpr::NumLt(a1, a2) => match is_same_aexpr(a1, a2) {
+            BooleanExpr::NumLt(a1, a2) => match a1 == a2 {
                 true => State::Bottom,
                 _ => Self::eval_specific_bexpr(expr, state),
             },
