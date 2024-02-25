@@ -27,8 +27,8 @@ pub fn sign_i64(i: i64) -> Sign {
 }
 pub fn mul_sign(i: Integer, sign: Sign) -> Integer {
     match sign {
-        Sign::Pos => i,
-        Sign::Zero => Integer::Value(0),
         Sign::Neg => -i,
+        Sign::Zero => Integer::Value(0),
+        Sign::Pos => i,
     }
 }

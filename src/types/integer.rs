@@ -164,7 +164,7 @@ pub fn random_integer_between(min: Integer, max: Integer) -> Integer {
         panic!("[ERROR] invalid interval: [{}, {}]", min, max);
     }
 
-    let rng: f32 = rand::thread_rng().gen();
+    let rng: f64 = rand::thread_rng().gen();
     let min = match min {
         Integer::Value(v) => v,
         Integer::NegInf => std::i64::MIN / 2,
@@ -177,5 +177,5 @@ pub fn random_integer_between(min: Integer, max: Integer) -> Integer {
         Integer::PosInf => std::i64::MAX / 2,
     };
 
-    Integer::Value((rng * (max - min) as f32) as i64 + min)
+    Integer::Value((rng * (max - min) as f64) as i64 + min)
 }

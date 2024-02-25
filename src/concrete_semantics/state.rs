@@ -15,10 +15,7 @@ impl StateOperations for State {
     }
 
     fn read(&self, var: &String) -> Integer {
-        match self.get(var) {
-            Some(val) => *val,
-            None => Integer::Value(0),
-        }
+        *self.get(var).unwrap_or(&Integer::Value(0))
     }
 
     fn put(&self, var: &String, val: Integer) -> State {

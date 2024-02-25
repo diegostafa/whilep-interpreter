@@ -17,19 +17,18 @@ TerminalStmt: Statement =
 {
     "skip" => Statement::Skip,
 
-    <x:Identifier> ":=" <e:AExpr> => Statement::Assignment{var: x, val: Box::new(e)},
-    <x:Identifier> "++" => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Add(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(ArithmeticExpr::Number(Integer::Value(1)))))},
-    <x:Identifier> "--" => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(ArithmeticExpr::Number(Integer::Value(1)))))},
-    <x:Identifier> "+=" <e:AExpr> => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Add(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
-    <x:Identifier> "-=" <e:AExpr> => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
-    <x:Identifier> "*=" <e:AExpr> => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Mul(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
-    <x:Identifier> "/=" <e:AExpr> => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Div(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
+    <x:Identifier> ":=" <e:AExpr>   => Statement::Assignment{var: x, val: Box::new(e)},
+    <x:Identifier> "++"             => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Add(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(ArithmeticExpr::Number(Integer::Value(1)))))},
+    <x:Identifier> "--"             => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(ArithmeticExpr::Number(Integer::Value(1)))))},
+    <x:Identifier> "+=" <e:AExpr>   => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Add(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
+    <x:Identifier> "-=" <e:AExpr>   => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
+    <x:Identifier> "*=" <e:AExpr>   => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Mul(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
+    <x:Identifier> "/=" <e:AExpr>   => Statement::Assignment{var:x.clone(), val: Box::new(ArithmeticExpr::Div(Box::new(ArithmeticExpr::Identifier(x.clone())), Box::new(e)))},
 
-    "if" <b:BExpr> "then" <s1:Stmt> "end"  => Statement::If{cond:Box::new(b), s1: Box::new(s1), s2: Box::new(Statement::Skip)},
+    "if" <b:BExpr> "then" <s1:Stmt> "end"                   => Statement::If{cond:Box::new(b), s1: Box::new(s1), s2: Box::new(Statement::Skip)},
     "if" <b:BExpr> "then" <s1:Stmt> "else" <s2:Stmt> "end"  => Statement::If{cond:Box::new(b), s1: Box::new(s1), s2: Box::new(s2)},
-
-    "while" <b:BExpr> "do" <s:Stmt> "done" => Statement::While{cond: Box::new(b), body: Box::new(s)},
-    "repeat" <s:Stmt> "until" <b:BExpr> => Statement::RepeatUntil{cond: Box::new(b), body: Box::new(s)},
+    "while" <b:BExpr> "do" <s:Stmt> "done"                  => Statement::While{cond: Box::new(b), body: Box::new(s)},
+    "repeat" <s:Stmt> "until" <b:BExpr>                     => Statement::RepeatUntil{cond: Box::new(b), body: Box::new(s)},
 
     "for" <x:Identifier> "in"  "[" <from:Number> ","  <to:Number> "]" "do" <s:Stmt> "done"
         => Statement::Chain(
@@ -46,30 +45,30 @@ TerminalStmt: Statement =
 AExpr: ArithmeticExpr =
 {
     #[precedence(level="1")]
-    <x:Identifier>                      => ArithmeticExpr::Identifier(x),
-    <n:Number>                          => ArithmeticExpr::Number(n),
+    <x:Identifier>      => ArithmeticExpr::Identifier(x),
+    <n:Number>          => ArithmeticExpr::Number(n),
 
     #[precedence(level="2")]
     <x:Identifier> "++" => ArithmeticExpr::PostIncrement(x),
     <x:Identifier> "--" => ArithmeticExpr::PostDecrement(x),
 
     #[precedence(level="5")]
-    "(" <l:AExpr> "+" <r:AExpr> ")" => ArithmeticExpr::Add(Box::new(l), Box::new(r)),
-    "(" <l:AExpr> "-" <r:AExpr> ")" => ArithmeticExpr::Sub(Box::new(l), Box::new(r)),
-    "[" <n:Number> "," <m:Number> "]" => ArithmeticExpr::Interval(n, m),
-    "[" "neginf" "," <m:Number> "]" => ArithmeticExpr::Interval(Integer::NegInf, m),
-    "[" <n:Number> "," "posinf" "]" => ArithmeticExpr::Interval(n, Integer::PosInf),
-    "[" "neginf" "," "posinf" "]" => ArithmeticExpr::Interval(Integer::NegInf, Integer::PosInf),
-    "-" <a:AExpr>                   => ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Number(Integer::Value(0))), Box::new(a)),
-    "(" <l:AExpr> "/" <r:AExpr> ")" => ArithmeticExpr::Div(Box::new(l), Box::new(r)),
-    "(" <l:AExpr> "*" <r:AExpr> ")" => ArithmeticExpr::Mul(Box::new(l), Box::new(r)),
+    "(" <l:AExpr> "+" <r:AExpr> ")"     => ArithmeticExpr::Add(Box::new(l), Box::new(r)),
+    "(" <l:AExpr> "-" <r:AExpr> ")"     => ArithmeticExpr::Sub(Box::new(l), Box::new(r)),
+    "[" <n:Number> "," <m:Number> "]"   => ArithmeticExpr::Interval(n, m),
+    "[" "neginf" "," <m:Number> "]"     => ArithmeticExpr::Interval(Integer::NegInf, m),
+    "[" <n:Number> "," "posinf" "]"     => ArithmeticExpr::Interval(n, Integer::PosInf),
+    "[" "neginf" "," "posinf" "]"       => ArithmeticExpr::Interval(Integer::NegInf, Integer::PosInf),
+    "-" <a:AExpr>                       => ArithmeticExpr::Sub(Box::new(ArithmeticExpr::Number(Integer::Value(0))), Box::new(a)),
+    "(" <l:AExpr> "/" <r:AExpr> ")"     => ArithmeticExpr::Div(Box::new(l), Box::new(r)),
+    "(" <l:AExpr> "*" <r:AExpr> ")"     => ArithmeticExpr::Mul(Box::new(l), Box::new(r)),
 };
 
 BExpr: BooleanExpr =
 {
     #[precedence(level="1")]
-    "true"                      => BooleanExpr::True,
-    "false"                     => BooleanExpr::False,
+    "true"  => BooleanExpr::True,
+    "false" => BooleanExpr::False,
 
     #[precedence(level="3")]
     "!" <e:BExpr>                       => BooleanExpr::Not(Box::new(e)),

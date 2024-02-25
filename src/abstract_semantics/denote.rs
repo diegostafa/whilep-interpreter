@@ -54,17 +54,17 @@ fn conditional<'a, T: Domain + 'a>(
     s2: StateFunction<'a, T>,
 ) -> StateFunction<'a, T> {
     Box::new(move |state| {
-        let if_cond_state = T::eval_bexpr(&cond, &state);
-        let el_cond_state = T::eval_bexpr(&negate_bexpr(&cond), &state);
-        let (s1_state, s1_inv) = s1(if_cond_state.clone());
-        let (s2_state, s2_inv) = s2(el_cond_state.clone());
+        let if_state = T::eval_bexpr(&cond, &state);
+        let el_state = T::eval_bexpr(&negate_bexpr(&cond), &state);
+        let (s1_state, s1_inv) = s1(if_state.clone());
+        let (s2_state, s2_inv) = s2(el_state.clone());
         let end_state = s1_state.union(&s2_state);
         (
             end_state.clone(),
             concat(&[
-                vec![if_cond_state],
+                vec![if_state],
                 s1_inv,
-                vec![el_cond_state],
+                vec![el_state],
                 s2_inv,
                 vec![end_state],
             ]),

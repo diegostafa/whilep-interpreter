@@ -10,10 +10,7 @@ pub trait InvariantOperations<T: Domain>: Sized {
 
 impl<T: Domain> InvariantOperations<T> for Invariant<T> {
     fn back(&self) -> State<T> {
-        match self.last() {
-            Some(state) => state.clone(),
-            None => State::new(),
-        }
+        self.last().unwrap_or(&State::new()).clone()
     }
 
     fn append(&mut self, state: State<T>) -> &Self {

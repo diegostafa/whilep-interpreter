@@ -19,10 +19,7 @@ impl<T: Domain> State<T> {
     pub fn read(&self, var: &String) -> T {
         match self {
             State::Bottom => T::BOT,
-            State::Just(state) => match state.get(var) {
-                Some(val) => val.clone(),
-                None => T::TOP,
-            },
+            State::Just(state) => *state.get(var).unwrap_or(&T::TOP),
         }
     }
 
