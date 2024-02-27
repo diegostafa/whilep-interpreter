@@ -118,9 +118,8 @@ fn fix(f: Functional) -> StateFunction {
         let mut g = bottom();
         loop {
             g = f(g);
-            let final_state = g(state.clone());
-            if final_state.is_some() {
-                return final_state;
+            if let Some(state) = g(state.clone()) {
+                return Some(state);
             }
         }
     })
@@ -132,10 +131,9 @@ fn _fix(f: Functional) -> StateFunction {
         let mut n = 0;
         loop {
             n += 1;
-            let f = f.compose_many(n, bottom());
-            let final_state = f(state.clone());
-            if final_state.is_some() {
-                return final_state;
+            let g = f.compose_many(n, bottom());
+            if let Some(state) = g(state.clone()) {
+                return Some(state);
             }
         }
     })
