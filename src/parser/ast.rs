@@ -4,6 +4,8 @@ use std::fmt;
 
 lalrpop_mod!(pub whilep);
 
+pub type Identifier = String;
+
 pub fn parse(source: &str) -> Result<Statement, ParseError<usize, Token, &'static str>> {
     whilep::StmtParser::new().parse(source)
 }
@@ -13,7 +15,7 @@ pub enum Statement {
     Skip,
     Chain(Box<Statement>, Box<Statement>),
     Assignment {
-        var: String,
+        var: Identifier,
         val: Box<ArithmeticExpr>,
     },
     If {
@@ -36,13 +38,13 @@ pub enum Statement {
 pub enum ArithmeticExpr {
     Number(Integer),
     Interval(Integer, Integer),
-    Identifier(String),
+    Variable(Identifier),
     Add(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Sub(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Mul(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Div(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
-    PostIncrement(String),
-    PostDecrement(String),
+    PostIncrement(Identifier),
+    PostDecrement(Identifier),
 }
 
 #[derive(Debug, Clone)]
@@ -100,7 +102,7 @@ impl fmt::Display for ArithmeticExpr {
         match self {
             ArithmeticExpr::Number(n) => write!(f, "{}", n),
             ArithmeticExpr::Interval(a, b) => write!(f, "[{}, {}]", a, b),
-            ArithmeticExpr::Identifier(s) => write!(f, "{}", s),
+            ArithmeticExpr::Variable(s) => write!(f, "{}", s),
             ArithmeticExpr::Add(a, b) => write!(f, "({} + {})", a, b),
             ArithmeticExpr::Sub(a, b) => write!(f, "({} - {})", a, b),
             ArithmeticExpr::Mul(a, b) => write!(f, "({} * {})", a, b),
@@ -134,7 +136,7 @@ impl PartialEq for ArithmeticExpr {
         match (self, other) {
             (ArithmeticExpr::Number(a), ArithmeticExpr::Number(b)) => a == b,
 
-            (ArithmeticExpr::Identifier(a), ArithmeticExpr::Identifier(b))
+            (ArithmeticExpr::Variable(a), ArithmeticExpr::Variable(b))
             | (ArithmeticExpr::PostDecrement(a), ArithmeticExpr::PostDecrement(b))
             | (ArithmeticExpr::PostIncrement(a), ArithmeticExpr::PostIncrement(b)) => a == b,
 

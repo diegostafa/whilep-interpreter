@@ -50,7 +50,7 @@ pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> (Integer, State) {
     match expr {
         ArithmeticExpr::Number(n) => (*n, state.clone()),
         ArithmeticExpr::Interval(n, m) => (random_integer_between(*n, *m), state.clone()),
-        ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
+        ArithmeticExpr::Variable(var) => (state.read(var), state.clone()),
         ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
         ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
         ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
@@ -99,7 +99,7 @@ fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
     })
 }
 
-fn state_update(var: String, val: ArithmeticExpr) -> StateFunction {
+fn state_update(var: Identifier, val: ArithmeticExpr) -> StateFunction {
     Box::new(move |state| {
         let (val, new_state) = eval_aexpr(&val, &state);
         Some(new_state.put(&var, val))

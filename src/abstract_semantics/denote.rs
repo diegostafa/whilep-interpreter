@@ -40,7 +40,7 @@ fn compose<'a, T: Domain + 'a>(
     })
 }
 
-fn state_update<'a, T: Domain + 'a>(var: String, val: ArithmeticExpr) -> StateFunction<'a, T> {
+fn state_update<'a, T: Domain + 'a>(var: Identifier, val: ArithmeticExpr) -> StateFunction<'a, T> {
     Box::new(move |state| {
         let (interval, new_state) = T::eval_aexpr(&val, &state);
         let new_state = new_state.put(&var, interval);

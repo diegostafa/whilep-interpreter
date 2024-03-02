@@ -8,7 +8,7 @@ use std::fmt;
 #[derive(Debug, Clone, Eq)]
 pub enum State<T: Domain> {
     Bottom,
-    Just(HashMap<String, T>),
+    Just(HashMap<Identifier, T>),
 }
 
 impl<T: Domain> State<T> {
@@ -16,14 +16,14 @@ impl<T: Domain> State<T> {
         State::Just(HashMap::new())
     }
 
-    pub fn read(&self, var: &String) -> T {
+    pub fn read(&self, var: &Identifier) -> T {
         match self {
             State::Bottom => T::BOT,
             State::Just(state) => *state.get(var).unwrap_or(&T::TOP),
         }
     }
 
-    pub fn put(&self, var: &String, val: T) -> Self {
+    pub fn put(&self, var: &Identifier, val: T) -> Self {
         match self.clone() {
             State::Bottom => State::Bottom,
             _ if val == T::BOT => State::Bottom,
@@ -138,8 +138,8 @@ impl<T: Domain> fmt::Display for State<T> {
 // --- helpers
 
 fn point_wise_op<T: Domain>(
-    s1: &HashMap<String, T>,
-    s2: &HashMap<String, T>,
+    s1: &HashMap<Identifier, T>,
+    s2: &HashMap<Identifier, T>,
     op: fn(T, T) -> T,
 ) -> State<T> {
     let mut new_state = State::new();

@@ -29,7 +29,7 @@ pub trait Domain: DomainProperties {
                 (val, state.put(var, val - Self::UNIT))
             }
 
-            ArithmeticExpr::Identifier(var) => (state.read(var), state.clone()),
+            ArithmeticExpr::Variable(var) => (state.read(var), state.clone()),
             ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
             ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
             ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),

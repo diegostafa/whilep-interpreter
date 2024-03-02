@@ -5,7 +5,7 @@ use crate::parser::ast::*;
 #[derive(Debug)]
 pub enum ExpressionTree<T: Domain> {
     Value(T),
-    Variable(String, T),
+    Variable(Identifier, T),
     Binop(
         ArithmeticExpr,
         T,
@@ -31,7 +31,7 @@ impl<T: Domain> ExpressionTree<T> {
                 (ExpressionTree::Value(val), new_state)
             }
 
-            ArithmeticExpr::Identifier(var)
+            ArithmeticExpr::Variable(var)
             | ArithmeticExpr::PostIncrement(var)
             | ArithmeticExpr::PostDecrement(var) => {
                 (ExpressionTree::Variable(var.to_string(), val), new_state)
