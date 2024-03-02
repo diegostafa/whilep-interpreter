@@ -83,25 +83,11 @@ fn fix_while<'a, T: Domain + 'a>(
             let exit_state = state.widen(&body_state);
             (cond_state, body_inv, exit_state)
         });
-
-        let lfp = |f: StateTransformer<T>| {
-            let mut prev_state = State::Bottom;
-            loop {
-                let (cond_state, body_inv, exit_state) = f(&prev_state);
-                match prev_state == exit_state {
-                    true => break (cond_state, body_inv, exit_state),
-                    _ => prev_state = exit_state,
-                }
-            }
-        };
-
-        let (cond_state, body_inv, exit_state) = lfp(iteration);
-
+        let (cond_state, body_inv, exit_state) = fix(iteration);
         let exit_state = match body_inv.back() {
             State::Bottom => exit_state,
             s => exit_state.narrow(&s),
         };
-
         let exit_state = T::eval_bexpr(&negate_bexpr(&cond), &exit_state);
         (
             exit_state.clone(),
@@ -116,7 +102,6 @@ fn fix_repeat<'a, T: Domain + 'a>(
 ) -> StateFunction<'a, T> {
     Box::new(move |state| {
         let one_step_state = body(state.clone()).0;
-
         let iteration = Box::new(|prev_state: &State<T>| {
             let cond_state = T::eval_bexpr(&negate_bexpr(&cond), &prev_state);
             let (body_state, body_inv) = body(cond_state.clone());
@@ -124,26 +109,11 @@ fn fix_repeat<'a, T: Domain + 'a>(
             let exit_state = one_step_state.widen(&body_state);
             (cond_state, body_inv, exit_state)
         });
-
-        let lfp = |f: StateTransformer<T>| {
-            let mut prev_state = State::Bottom;
-
-            loop {
-                let (cond_state, body_inv, exit_state) = f(&prev_state);
-                match prev_state == exit_state {
-                    true => break (cond_state, body_inv, exit_state),
-                    _ => prev_state = exit_state,
-                }
-            }
-        };
-
-        let (cond_state, body_inv, exit_state) = lfp(iteration);
-
+        let (cond_state, body_inv, exit_state) = fix(iteration);
         let exit_state = match body_inv.back() {
             State::Bottom => one_step_state.clone(),
             s => exit_state.narrow(&s),
         };
-
         let exit_state = T::eval_bexpr(&cond, &exit_state);
         (
             exit_state.clone(),
@@ -155,4 +125,15 @@ fn fix_repeat<'a, T: Domain + 'a>(
             ]),
         )
     })
+}
+
+fn fix<T: Domain>(f: StateTransformer<T>) -> (State<T>, Invariant<T>, State<T>) {
+    let mut prev_state = State::Bottom;
+    loop {
+        let (cond_state, body_inv, exit_state) = f(&prev_state);
+        match prev_state == exit_state {
+            true => break (cond_state, body_inv, exit_state),
+            _ => prev_state = exit_state,
+        }
+    }
 }
