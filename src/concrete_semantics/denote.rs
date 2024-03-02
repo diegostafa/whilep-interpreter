@@ -54,7 +54,14 @@ pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> (Integer, State) {
         ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
         ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
         ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
-        ArithmeticExpr::Div(a1, a2) => binop_aexpr(|a, b| a / b, a1, a2, state),
+        ArithmeticExpr::Div(a1, a2) => {
+            let (a1_val, new_state) = eval_aexpr(a1, &state);
+            let (a2_val, new_state) = eval_aexpr(a2, &new_state);
+            match a2_val {
+                Integer::Value(0) => panic!("[ERROR] division by zero"),
+                _ => (a1_val / a2_val, new_state),
+            }
+        }
         ArithmeticExpr::PostIncrement(var) => {
             let val = state.read(var);
             (val, state.put(var, val + 1))
@@ -147,9 +154,9 @@ fn binop_aexpr(
     a2: &ArithmeticExpr,
     state: &State,
 ) -> (Integer, State) {
-    let (a1_interval, new_state) = eval_aexpr(a1, &state);
-    let (a2_interval, new_state) = eval_aexpr(a2, &new_state);
-    (op(a1_interval, a2_interval), new_state)
+    let (a1_val, new_state) = eval_aexpr(a1, &state);
+    let (a2_val, new_state) = eval_aexpr(a2, &new_state);
+    (op(a1_val, a2_val), new_state)
 }
 
 fn binop_bexpr(
@@ -169,7 +176,7 @@ fn binop_cmp(
     a2: &ArithmeticExpr,
     state: &State,
 ) -> (bool, State) {
-    let (a1_interval, new_state) = eval_aexpr(a1, &state);
-    let (a2_interval, new_state) = eval_aexpr(a2, &new_state);
-    (op(a1_interval, a2_interval), new_state)
+    let (a1_val, new_state) = eval_aexpr(a1, &state);
+    let (a2_val, new_state) = eval_aexpr(a2, &new_state);
+    (op(a1_val, a2_val), new_state)
 }

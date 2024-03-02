@@ -7,10 +7,10 @@ use trait_set::trait_set;
 
 trait_set! {
     pub trait Arithmetic = Sized + Add<Self, Output = Self> +Sub<Self, Output = Self> +Mul<Self, Output = Self> +Div<Self, Output = Self>;
-    pub trait DomainProperties = Sized + Lattice + Display + Clone + Copy + Eq + Arithmetic + Debug;
+    pub trait DomainProperties = Sized + Display + Clone + Copy + Eq + Debug;
 }
 
-pub trait Domain: DomainProperties {
+pub trait Domain: DomainProperties + Lattice + Arithmetic {
     fn eval_specific_aexpr(expr: &ArithmeticExpr, state: &State<Self>) -> (Self, State<Self>);
     fn eval_specific_bexpr(expr: &BooleanExpr, state: &State<Self>) -> State<Self>;
 

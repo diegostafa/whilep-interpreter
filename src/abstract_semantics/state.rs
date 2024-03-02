@@ -43,7 +43,7 @@ impl<T: Domain> State<T> {
                 let a = l.get_value();
                 let b = r.get_value();
 
-                let (lval, rval) = match op {
+                let (refined_a, refined_b) = match op {
                     ArithmeticExpr::Add(_, _) => (c.clone() - b, c - a),
                     ArithmeticExpr::Sub(_, _) => (c.clone() + b, a - c),
                     ArithmeticExpr::Mul(_, _) => (c.clone() / b, c / a),
@@ -51,8 +51,8 @@ impl<T: Domain> State<T> {
                     _ => unreachable!(),
                 };
 
-                self.refine_expression_tree(l, lval)
-                    .refine_expression_tree(r, rval)
+                self.refine_expression_tree(l, refined_a)
+                    .refine_expression_tree(r, refined_b)
             }
         }
     }
