@@ -1,6 +1,5 @@
 use crate::abstract_semantics::state::*;
 use crate::domain::domain::*;
-use crate::domain::expression_tree::*;
 use crate::domain::lattice::*;
 use crate::parser::ast::*;
 use crate::types::integer::*;
@@ -57,18 +56,6 @@ impl Domain for Constant {
 
     fn eval_specific_bexpr(expr: &BooleanExpr, state: &State<Self>) -> State<Self> {
         match expr {
-            BooleanExpr::NumEq(a1, a2) => {
-                let (ltree, new_state) = ExpressionTree::build(a1, state);
-                let (rtree, new_state) = ExpressionTree::build(a2, &new_state);
-                let (i1, i2) = (ltree.get_value(), rtree.get_value());
-
-                match i1.intersection(&i2) {
-                    Constant::None => State::Bottom,
-                    intersection => new_state
-                        .refine_expression_tree(&ltree, intersection)
-                        .refine_expression_tree(&rtree, intersection),
-                }
-            }
             BooleanExpr::NumLt(a1, a2) => {
                 let (lhs, new_state) = Self::eval_aexpr(a1, &state);
                 let (rhs, new_state) = Self::eval_aexpr(a2, &new_state);

@@ -83,30 +83,10 @@ impl Domain for Interval {
 
     fn eval_specific_bexpr(cmp_expr: &BooleanExpr, state: &State<Self>) -> State<Self> {
         match cmp_expr {
-            BooleanExpr::NumEq(a1, a2) => {
-                let (ltree, _) = ExpressionTree::build(a1, state);
-                let (rtree, _) = ExpressionTree::build(a2, state);
-                let (i1, i2) = (ltree.get_value(), rtree.get_value());
-
-                match i1.intersection(&i2) {
-                    Interval::Empty => State::Bottom,
-                    intersection => {
-                        let new_state = state
-                            .refine_expression_tree(&ltree, intersection)
-                            .refine_expression_tree(&rtree, intersection);
-
-                        let a1_state = Self::eval_aexpr(a1, &new_state).1;
-                        let a2_state = Self::eval_aexpr(a2, &a1_state).1;
-                        a2_state
-                    }
-                }
-            }
-
             BooleanExpr::NumLt(a1, a2) => {
                 let (ltree, _) = ExpressionTree::build(a1, state);
                 let (rtree, _) = ExpressionTree::build(a2, state);
                 let (i1, i2) = (ltree.get_value(), rtree.get_value());
-
                 let one = Integer::Value(1);
                 let lhs = i1.intersection(&i2.add_min(Integer::NegInf).add_max(-one));
                 let rhs = i2.intersection(&i1.add_max(Integer::PosInf).add_min(one));

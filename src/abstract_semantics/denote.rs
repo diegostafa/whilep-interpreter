@@ -129,10 +129,15 @@ fn fix_repeat<'a, T: Domain + 'a>(
 
 fn fix<T: Domain>(f: StateTransformer<T>) -> (State<T>, Invariant<T>, State<T>) {
     let mut prev_state = State::Bottom;
+    let mut n = 0;
     loop {
+        n += 1;
         let (cond_state, body_inv, exit_state) = f(&prev_state);
         match prev_state == exit_state {
-            true => break (cond_state, body_inv, exit_state),
+            true => {
+                println!("[INFO] found fixpoint in {} iterations", n);
+                break (cond_state, body_inv, exit_state);
+            }
             _ => prev_state = exit_state,
         }
     }
