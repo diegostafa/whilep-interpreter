@@ -135,10 +135,7 @@ impl PartialEq for ArithmeticExpr {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (ArithmeticExpr::Number(a), ArithmeticExpr::Number(b)) => a == b,
-
-            (ArithmeticExpr::Variable(a), ArithmeticExpr::Variable(b))
-            | (ArithmeticExpr::PostDecrement(a), ArithmeticExpr::PostDecrement(b))
-            | (ArithmeticExpr::PostIncrement(a), ArithmeticExpr::PostIncrement(b)) => a == b,
+            (ArithmeticExpr::Variable(a), ArithmeticExpr::Variable(b)) => a == b,
 
             (ArithmeticExpr::Add(a1, a2), ArithmeticExpr::Add(b1, b2))
             | (ArithmeticExpr::Mul(a1, a2), ArithmeticExpr::Mul(b1, b2)) => {

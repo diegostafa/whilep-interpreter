@@ -83,6 +83,7 @@ impl Domain for Interval {
 
     fn eval_specific_bexpr(cmp_expr: &BooleanExpr, state: &State<Self>) -> State<Self> {
         match cmp_expr {
+            BooleanExpr::NumNotEq(a1, a2) => Self::eval_aexpr(a2, &Self::eval_aexpr(a1, state).1).1,
             BooleanExpr::NumLt(a1, a2) => {
                 let (ltree, _) = ExpressionTree::build(a1, state);
                 let (rtree, _) = ExpressionTree::build(a2, state);
@@ -98,6 +99,7 @@ impl Domain for Interval {
                             .refine_expression_tree(&ltree, lhs)
                             .refine_expression_tree(&rtree, rhs);
 
+                        // apply side effects
                         let a1_state = Self::eval_aexpr(a1, &new_state).1;
                         let a2_state = Self::eval_aexpr(a2, &a1_state).1;
                         a2_state
@@ -139,6 +141,7 @@ impl Lattice for Interval {
     }
 
     fn widen(&self, other: &Self) -> Self {
+        // if bounds are defined, apply union
         unsafe {
             if LOWER_BOUND != Integer::NegInf || UPPER_BOUND != Integer::PosInf {
                 return self.union(other);

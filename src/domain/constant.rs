@@ -56,14 +56,29 @@ impl Domain for Constant {
 
     fn eval_specific_bexpr(expr: &BooleanExpr, state: &State<Self>) -> State<Self> {
         match expr {
-            BooleanExpr::NumLt(a1, a2) => {
+            BooleanExpr::NumNotEq(a1, a2) => {
                 let (lhs, new_state) = Self::eval_aexpr(a1, &state);
                 let (rhs, new_state) = Self::eval_aexpr(a2, &new_state);
                 match (lhs, rhs) {
                     (Constant::None, _) | (_, Constant::None) => State::Bottom,
                     (Constant::Any, _) | (_, Constant::Any) => new_state,
-                    (Constant::Value(l), Constant::Value(r)) if l < r => new_state,
-                    _ => State::Bottom,
+                    (Constant::Value(l), Constant::Value(r)) => match l != r {
+                        true => new_state,
+                        _ => State::Bottom,
+                    },
+                }
+            }
+            BooleanExpr::NumLt(a1, a2) => {
+                let (lhs, new_state) = Self::eval_aexpr(a1, &state);
+                let (rhs, new_state) = Self::eval_aexpr(a2, &new_state);
+                println!("{} < {}", lhs, rhs);
+                match (lhs, rhs) {
+                    (Constant::None, _) | (_, Constant::None) => State::Bottom,
+                    (Constant::Any, _) | (_, Constant::Any) => new_state,
+                    (Constant::Value(l), Constant::Value(r)) => match l < r {
+                        true => new_state,
+                        _ => State::Bottom,
+                    },
                 }
             }
 
