@@ -1,4 +1,4 @@
-use crate::types::integer::*;
+use crate::{max, types::integer::*};
 use lalrpop_util::{lalrpop_mod, lexer::Token, ParseError};
 use std::fmt;
 
@@ -26,18 +26,25 @@ pub enum Statement {
     While {
         cond: Box<BooleanExpr>,
         body: Box<Statement>,
+        delay: Option<i64>,
     },
 
     RepeatUntil {
         body: Box<Statement>,
         cond: Box<BooleanExpr>,
+        delay: Option<i64>,
     },
+}
+
+pub enum ArithmeticExprError {
+    DivByZero,
+    InvalidIntervalBounds,
 }
 
 #[derive(Debug, Clone)]
 pub enum ArithmeticExpr {
     Number(Integer),
-    Interval(Integer, Integer),
+    Interval(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Variable(Identifier),
     Add(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
     Sub(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
@@ -62,25 +69,105 @@ pub enum BooleanExpr {
     NumGtEq(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
 }
 
-pub fn negate_bexpr(expr: &BooleanExpr) -> BooleanExpr {
-    match expr.clone() {
-        BooleanExpr::True => BooleanExpr::False,
-        BooleanExpr::False => BooleanExpr::True,
-        BooleanExpr::Not(b) => *b,
-        BooleanExpr::And(b1, b2) => BooleanExpr::Or(
-            Box::new(BooleanExpr::Not(b1)),
-            Box::new(BooleanExpr::Not(b2)),
-        ),
-        BooleanExpr::Or(b1, b2) => BooleanExpr::And(
-            Box::new(BooleanExpr::Not(b1)),
-            Box::new(BooleanExpr::Not(b2)),
-        ),
-        BooleanExpr::NumEq(a1, a2) => BooleanExpr::NumNotEq(a1, a2),
-        BooleanExpr::NumNotEq(a1, a2) => BooleanExpr::NumEq(a1, a2),
-        BooleanExpr::NumLt(a1, a2) => BooleanExpr::NumGtEq(a1, a2),
-        BooleanExpr::NumGt(a1, a2) => BooleanExpr::NumLtEq(a1, a2),
-        BooleanExpr::NumLtEq(a1, a2) => BooleanExpr::NumGt(a1, a2),
-        BooleanExpr::NumGtEq(a1, a2) => BooleanExpr::NumLt(a1, a2),
+impl BooleanExpr {
+    pub fn negate(&self) -> BooleanExpr {
+        match self.clone() {
+            BooleanExpr::True => BooleanExpr::False,
+            BooleanExpr::False => BooleanExpr::True,
+            BooleanExpr::Not(b) => *b,
+            BooleanExpr::And(b1, b2) => BooleanExpr::Or(
+                Box::new(BooleanExpr::Not(b1)),
+                Box::new(BooleanExpr::Not(b2)),
+            ),
+            BooleanExpr::Or(b1, b2) => BooleanExpr::And(
+                Box::new(BooleanExpr::Not(b1)),
+                Box::new(BooleanExpr::Not(b2)),
+            ),
+            BooleanExpr::NumEq(a1, a2) => BooleanExpr::NumNotEq(a1, a2),
+            BooleanExpr::NumNotEq(a1, a2) => BooleanExpr::NumEq(a1, a2),
+            BooleanExpr::NumLt(a1, a2) => BooleanExpr::NumGtEq(a1, a2),
+            BooleanExpr::NumGt(a1, a2) => BooleanExpr::NumLtEq(a1, a2),
+            BooleanExpr::NumLtEq(a1, a2) => BooleanExpr::NumGt(a1, a2),
+            BooleanExpr::NumGtEq(a1, a2) => BooleanExpr::NumLt(a1, a2),
+        }
+    }
+
+    pub fn get_max_number_or(&self, curr_max: i64) -> i64 {
+        match self.clone() {
+            BooleanExpr::NumEq(a1, a2)
+            | BooleanExpr::NumNotEq(a1, a2)
+            | BooleanExpr::NumLt(a1, a2)
+            | BooleanExpr::NumGt(a1, a2)
+            | BooleanExpr::NumLtEq(a1, a2)
+            | BooleanExpr::NumGtEq(a1, a2) => {
+                max!(
+                    a1.get_max_number_or(curr_max),
+                    a2.get_max_number_or(curr_max)
+                ) + 1
+            }
+            _ => curr_max,
+        }
+    }
+}
+
+impl Statement {
+    pub fn get_max_number_or(&self, curr_max: i64) -> i64 {
+        match self.clone() {
+            Statement::Skip => curr_max,
+            Statement::Chain(s1, s2) => max!(
+                s1.get_max_number_or(curr_max),
+                s2.get_max_number_or(curr_max)
+            ),
+            Statement::Assignment { var: _, val } => val.get_max_number_or(curr_max),
+            Statement::If { cond, s1, s2 } => {
+                max!(
+                    cond.get_max_number_or(curr_max),
+                    s1.get_max_number_or(curr_max),
+                    s2.get_max_number_or(curr_max)
+                )
+            }
+            Statement::While {
+                cond,
+                body,
+                delay: _,
+            } => {
+                max!(
+                    cond.get_max_number_or(curr_max),
+                    body.get_max_number_or(curr_max)
+                )
+            }
+            Statement::RepeatUntil {
+                body,
+                cond,
+                delay: _,
+            } => {
+                max!(
+                    cond.get_max_number_or(curr_max),
+                    body.get_max_number_or(curr_max)
+                )
+            }
+        }
+    }
+}
+
+impl ArithmeticExpr {
+    pub fn get_max_number_or(&self, curr_max: i64) -> i64 {
+        match self.clone() {
+            ArithmeticExpr::Number(Integer::Value(n)) => max!(n.abs(), curr_max),
+
+            ArithmeticExpr::Interval(a1, a2)
+            | ArithmeticExpr::Add(a1, a2)
+            | ArithmeticExpr::Sub(a1, a2)
+            | ArithmeticExpr::Mul(a1, a2)
+            | ArithmeticExpr::Div(a1, a2) => {
+                max!(
+                    a1.get_max_number_or(curr_max),
+                    a2.get_max_number_or(curr_max)
+                )
+            }
+
+            _ => curr_max,
+        }
     }
 }
 
@@ -91,8 +178,10 @@ impl fmt::Display for Statement {
             Statement::Assignment { var, val } => write!(f, "{} := {}", var, val),
             Statement::Chain(s1, s2) => write!(f, "{}; {}", s1, s2),
             Statement::If { cond, s1, s2 } => write!(f, "if {} then {} else {} end", cond, s1, s2),
-            Statement::While { cond, body } => write!(f, "while {} do {} done", cond, body),
-            Statement::RepeatUntil { cond, body } => write!(f, "repeat {} until {}", body, cond),
+            Statement::While { cond, body, .. } => write!(f, "while {} do {} done", cond, body),
+            Statement::RepeatUntil { cond, body, .. } => {
+                write!(f, "repeat {} until {}", body, cond)
+            }
         }
     }
 }

@@ -1,7 +1,7 @@
 use crate::types::sign::*;
 use rand::Rng;
 use std::{
-    fmt::{self},
+    fmt,
     ops::{self},
     str::FromStr,
 };
@@ -11,6 +11,16 @@ pub enum Integer {
     NegInf,
     Value(i64),
     PosInf,
+}
+
+impl Integer {
+    pub fn get_value(&self) -> i64 {
+        match *self {
+            Integer::NegInf => std::i64::MIN,
+            Integer::Value(v) => v,
+            Integer::PosInf => std::i64::MAX,
+        }
+    }
 }
 
 impl fmt::Display for Integer {
@@ -165,6 +175,7 @@ pub fn random_integer_between(min: Integer, max: Integer) -> Integer {
     }
 
     let rng: f64 = rand::thread_rng().gen();
+
     let min = match min {
         Integer::Value(v) => v,
         Integer::NegInf => std::i64::MIN / 2,

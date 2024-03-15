@@ -71,10 +71,11 @@ impl Domain for Interval {
     fn eval_specific_aexpr(expr: &ArithmeticExpr, state: &State<Self>) -> (Self, State<Self>) {
         let (val, new_state) = match expr {
             ArithmeticExpr::Number(n) => (Interval::Range(*n, *n), state.clone()),
-            ArithmeticExpr::Interval(n, m) => match n <= m {
-                true => (Interval::Range(*n, *m), state.clone()),
-                _ => (Interval::Empty, state.clone()),
-            },
+            ArithmeticExpr::Interval(a1, a2) => {
+                let (a1_val, a1_state) = Self::eval_aexpr(a1, state);
+                let (a2_val, a2_state) = Self::eval_aexpr(a2, &a1_state);
+                (a1_val.union(&a2_val), a2_state)
+            }
             _ => unreachable!(),
         };
 

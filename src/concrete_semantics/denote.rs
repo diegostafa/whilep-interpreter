@@ -4,6 +4,8 @@ use crate::types::integer::*;
 
 // --- type aliases
 
+type IntResult = Result<(Integer, State), ArithmeticExprError>;
+type BoolResult = Result<(bool, State), ArithmeticExprError>;
 type StateFunction = Box<dyn Fn(State) -> Option<State>>;
 type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
 
@@ -28,13 +30,13 @@ pub fn denote_stmt(stmt: Statement) -> StateFunction {
         Statement::Chain(s1, s2) => compose(denote_stmt(*s1), denote_stmt(*s2)),
         Statement::Assignment { var, val } => state_update(var, *val),
         Statement::If { cond, s1, s2 } => conditional(*cond, denote_stmt(*s1), denote_stmt(*s2)),
-        Statement::While { cond, body } => {
+        Statement::While { cond, body, .. } => {
             let f = Box::new(move |g| {
                 conditional(*cond.clone(), compose(denote_stmt(*body.clone()), g), id())
             });
             fix(f)
         }
-        Statement::RepeatUntil { body, cond } => {
+        Statement::RepeatUntil { body, cond, .. } => {
             let f = Box::new(move |g| {
                 compose(
                     denote_stmt(*body.clone()),
@@ -46,38 +48,45 @@ pub fn denote_stmt(stmt: Statement) -> StateFunction {
     }
 }
 
-pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> (Integer, State) {
+pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> IntResult {
     match expr {
-        ArithmeticExpr::Number(n) => (*n, state.clone()),
-        ArithmeticExpr::Interval(n, m) => (random_integer_between(*n, *m), state.clone()),
-        ArithmeticExpr::Variable(var) => (state.read(var), state.clone()),
+        ArithmeticExpr::Number(n) => Ok((*n, state.clone())),
+        ArithmeticExpr::Interval(a1, a2) => {
+            let (a1_val, new_state) = eval_aexpr(a1, &state)?;
+            let (a2_val, new_state) = eval_aexpr(a2, &new_state)?;
+            match a1_val <= a2_val {
+                true => Ok((random_integer_between(a1_val, a2_val), new_state)),
+                _ => Err(ArithmeticExprError::InvalidIntervalBounds),
+            }
+        }
+        ArithmeticExpr::Variable(var) => Ok((state.read(var), state.clone())),
         ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
         ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
         ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
         ArithmeticExpr::Div(a1, a2) => {
-            let (a1_val, new_state) = eval_aexpr(a1, &state);
-            let (a2_val, new_state) = eval_aexpr(a2, &new_state);
+            let (a1_val, new_state) = eval_aexpr(a1, &state)?;
+            let (a2_val, new_state) = eval_aexpr(a2, &new_state)?;
             match a2_val {
-                Integer::Value(0) => panic!("[ERROR] division by zero"),
-                _ => (a1_val / a2_val, new_state),
+                Integer::Value(0) => Err(ArithmeticExprError::DivByZero),
+                _ => Ok((a1_val / a2_val, new_state)),
             }
         }
         ArithmeticExpr::PostIncrement(var) => {
             let val = state.read(var);
-            (val, state.put(var, val + 1))
+            Ok((val, state.put(var, val + 1)))
         }
         ArithmeticExpr::PostDecrement(var) => {
             let val = state.read(var);
-            (val, state.put(var, val - 1))
+            Ok((val, state.put(var, val - 1)))
         }
     }
 }
 
-pub fn eval_bexpr(expr: &BooleanExpr, state: &State) -> (bool, State) {
+pub fn eval_bexpr(expr: &BooleanExpr, state: &State) -> BoolResult {
     match expr {
-        BooleanExpr::True => (true, state.clone()),
-        BooleanExpr::False => (false, state.clone()),
-        BooleanExpr::Not(b) => eval_bexpr(&negate_bexpr(b), state),
+        BooleanExpr::True => Ok((true, state.clone())),
+        BooleanExpr::False => Ok((false, state.clone())),
+        BooleanExpr::Not(b) => eval_bexpr(&b.negate(), state),
         BooleanExpr::And(b1, b2) => binop_bexpr(|a, b| a && b, b1, b2, state),
         BooleanExpr::Or(b1, b2) => binop_bexpr(|a, b| a || b, b1, b2, state),
         BooleanExpr::NumEq(a1, a2) => binop_cmp(|a, b| a == b, a1, a2, state),
@@ -107,16 +116,17 @@ fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
 }
 
 fn state_update(var: Identifier, val: ArithmeticExpr) -> StateFunction {
-    Box::new(move |state| {
-        let (val, new_state) = eval_aexpr(&val, &state);
-        Some(new_state.put(&var, val))
+    Box::new(move |state| match eval_aexpr(&val, &state) {
+        Ok((val, new_state)) => Some(new_state.put(&var, val)),
+        Err(_) => None,
     })
 }
 
 fn conditional(cond: BooleanExpr, s1: StateFunction, s2: StateFunction) -> StateFunction {
     Box::new(move |state| match eval_bexpr(&cond, &state) {
-        (true, new_state) => s1(new_state),
-        (_, new_state) => s2(new_state),
+        Ok((true, new_state)) => s1(new_state),
+        Ok((false, new_state)) => s2(new_state),
+        _ => None,
     })
 }
 
@@ -153,10 +163,10 @@ fn binop_aexpr(
     a1: &ArithmeticExpr,
     a2: &ArithmeticExpr,
     state: &State,
-) -> (Integer, State) {
-    let (a1_val, new_state) = eval_aexpr(a1, &state);
-    let (a2_val, new_state) = eval_aexpr(a2, &new_state);
-    (op(a1_val, a2_val), new_state)
+) -> IntResult {
+    let (a1_val, new_state) = eval_aexpr(a1, &state)?;
+    let (a2_val, new_state) = eval_aexpr(a2, &new_state)?;
+    Ok((op(a1_val, a2_val), new_state))
 }
 
 fn binop_bexpr(
@@ -164,10 +174,10 @@ fn binop_bexpr(
     b1: &BooleanExpr,
     b2: &BooleanExpr,
     state: &State,
-) -> (bool, State) {
-    let (b1_val, new_state) = eval_bexpr(b1, &state);
-    let (b2_val, new_state) = eval_bexpr(b2, &new_state);
-    (op(b1_val, b2_val), new_state)
+) -> BoolResult {
+    let (b1_val, new_state) = eval_bexpr(b1, &state)?;
+    let (b2_val, new_state) = eval_bexpr(b2, &new_state)?;
+    Ok((op(b1_val, b2_val), new_state))
 }
 
 fn binop_cmp(
@@ -175,8 +185,8 @@ fn binop_cmp(
     a1: &ArithmeticExpr,
     a2: &ArithmeticExpr,
     state: &State,
-) -> (bool, State) {
-    let (a1_val, new_state) = eval_aexpr(a1, &state);
-    let (a2_val, new_state) = eval_aexpr(a2, &new_state);
-    (op(a1_val, a2_val), new_state)
+) -> BoolResult {
+    let (a1_val, new_state) = eval_aexpr(a1, &state)?;
+    let (a2_val, new_state) = eval_aexpr(a2, &new_state)?;
+    Ok((op(a1_val, a2_val), new_state))
 }

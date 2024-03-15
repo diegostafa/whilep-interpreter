@@ -1,5 +1,6 @@
 use crate::{types::integer::*, Identifier};
 use std::collections::HashMap;
+
 pub type State = HashMap<Identifier, Integer>;
 
 pub trait StateOperations {
@@ -15,7 +16,9 @@ impl StateOperations for State {
     }
 
     fn read(&self, var: &Identifier) -> Integer {
-        *self.get(var).unwrap_or(&Integer::Value(0))
+        *self
+            .get(var)
+            .unwrap_or(&random_integer_between(Integer::NegInf, Integer::PosInf))
     }
 
     fn put(&self, var: &Identifier, val: Integer) -> State {

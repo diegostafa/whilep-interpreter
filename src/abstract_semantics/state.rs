@@ -38,16 +38,16 @@ impl<T: Domain> State<T> {
         match tree {
             ExpressionTree::Value(_) => self.clone(),
             ExpressionTree::Variable(var, val) => self.put(var, val.intersection(&refined_value)),
-            ExpressionTree::Binop(op, val, l, r) => {
+            ExpressionTree::Binop(val, op, l, r) => {
                 let c = val.intersection(&refined_value);
                 let a = l.get_value();
                 let b = r.get_value();
 
                 let (refined_a, refined_b) = match op {
-                    ArithmeticExpr::Add(_, _) => (c.clone() - b, c - a),
-                    ArithmeticExpr::Sub(_, _) => (c.clone() + b, a - c),
-                    ArithmeticExpr::Mul(_, _) => (c.clone() / b, c / a),
-                    ArithmeticExpr::Div(_, _) => (c.clone() * b, a / c),
+                    ArithmeticExpr::Add(_, _) => (c - b, c - a),
+                    ArithmeticExpr::Sub(_, _) => (c + b, a - c),
+                    ArithmeticExpr::Mul(_, _) => (c / b, c / a),
+                    ArithmeticExpr::Div(_, _) => (c * b, a / c),
                     _ => unreachable!(),
                 };
 

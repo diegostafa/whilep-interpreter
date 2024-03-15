@@ -40,7 +40,7 @@ pub trait Domain: DomainProperties + Lattice + Arithmetic {
         match expr {
             BooleanExpr::True => state.clone(),
             BooleanExpr::False => State::Bottom,
-            BooleanExpr::Not(b) => Self::eval_bexpr(&negate_bexpr(b), state),
+            BooleanExpr::Not(b) => Self::eval_bexpr(&b.negate(), state),
             BooleanExpr::And(b1, b2) => {
                 let lhs1 = Self::eval_bexpr(b1, state);
                 let lhs2 = Self::eval_bexpr(b2, &lhs1);

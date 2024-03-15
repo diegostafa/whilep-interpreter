@@ -23,16 +23,19 @@ fn run_concrete(ast: &Statement) {
 
     println!("\n[INFO] evaluating the concrete semantics");
     let state = induced_function(State::new());
+    match state {
+        None => println!("[ERROR] Arithmetic expression error"),
+        Some(state) => {
+            let headers = vec!["#".to_string(), "Var".to_string(), "Val".to_string()];
+            let rows = state
+                .iter()
+                .enumerate()
+                .map(|(i, (k, v))| vec![i.to_string(), k.to_string(), v.to_string()])
+                .collect::<Vec<_>>();
 
-    let headers = vec!["#".to_string(), "Var".to_string(), "Val".to_string()];
-    let rows = state
-        .unwrap()
-        .iter()
-        .enumerate()
-        .map(|(i, (k, v))| vec![i.to_string(), k.to_string(), v.to_string()])
-        .collect::<Vec<_>>();
-
-    draw_table(headers, rows)
+            draw_table(headers, rows)
+        }
+    }
 }
 
 fn run_abstract<T: Domain>(ast: &Statement) {
