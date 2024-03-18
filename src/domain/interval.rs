@@ -81,7 +81,14 @@ impl Domain for Interval {
             ArithmeticExpr::Interval(a1, a2) => {
                 let (a1_val, a1_state) = Self::eval_aexpr(a1, state);
                 let (a2_val, a2_state) = Self::eval_aexpr(a2, &a1_state);
-                (a1_val.lub(&a2_val), a2_state)
+
+                match (a1_val, a2_val) {
+                    (Interval::Empty, _) | (_, Interval::Empty) => (Interval::Empty, a2_state),
+                    (Interval::Range(_, b), Interval::Range(c, _)) if b > c => {
+                        (Interval::Empty, a2_state)
+                    }
+                    _ => (a1_val.lub(&a2_val), a2_state),
+                }
             }
             _ => unreachable!(),
         };
