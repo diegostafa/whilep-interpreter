@@ -3,8 +3,8 @@ pub trait Lattice {
     const BOT: Self;
     const UNIT: Self;
 
-    fn union(&self, other: &Self) -> Self;
-    fn intersection(&self, other: &Self) -> Self;
+    fn lub(&self, other: &Self) -> Self;
+    fn glb(&self, other: &Self) -> Self;
     fn widen(&self, other: &Self) -> Self;
     fn narrow(&self, other: &Self) -> Self;
 }

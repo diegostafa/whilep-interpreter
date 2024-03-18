@@ -3,6 +3,7 @@ use crate::domain::domain::*;
 use crate::domain::interval::*;
 use crate::parser::ast::*;
 use crate::parser::program_point::*;
+use crate::types::integer::*;
 use cli::*;
 use std::fs;
 use std::str::FromStr;
@@ -21,7 +22,7 @@ fn run_concrete(ast: &Statement) {
 
     let induced_function = denote_stmt(ast.clone());
 
-    println!("\n[INFO] evaluating the concrete semantics");
+    println!("[INFO] evaluating the concrete semantics");
     let state = induced_function(State::new());
     match state {
         None => println!("[ERROR] Arithmetic expression error"),
@@ -45,11 +46,13 @@ fn run_abstract<T: Domain>(ast: &Statement) {
     let induced_function: StateFunction<T> = denote_stmt(ast.clone());
 
     println!(
-        "\n[INFO] evaluating the abstract semantics in the {} domain",
+        "[INFO] evaluating the abstract semantics in the {} domain",
         std::any::type_name::<T>().split("::").last().unwrap()
     );
     let (_, inv) = induced_function(State::new());
     let points = get_program_points(ast.clone());
+
+    assert!(inv.len() == points.len());
 
     let headers = vec![
         "#".to_string(),
@@ -67,17 +70,32 @@ fn run_abstract<T: Domain>(ast: &Statement) {
     draw_table(headers, rows)
 }
 
-fn set_min_max_interval(opts: &ProgramOptions) {
-    match opts.bounds.clone() {
-        None => (),
-        Some(b) => match Interval::from_str(&b).unwrap() {
-            Interval::Empty => unreachable!(),
-            Interval::Range(min, max) if min <= max => unsafe {
-                LOWER_BOUND = min;
+fn set_min_max_interval(opts: &ProgramOptions, ast: &Statement) {
+    unsafe {
+        match opts.bounds.clone() {
+            None => (),
+            Some(b) if b == "auto" => {
+                let max = ast
+                    .get_max_number()
+                    .map(|n| Integer::Value(n))
+                    .unwrap_or(Integer::PosInf);
+
+                LOWER_BOUND = -max;
                 UPPER_BOUND = max;
+            }
+            Some(b) => match Interval::from_str(&b).unwrap() {
+                Interval::Empty => unreachable!(),
+                Interval::Range(min, max) if min <= max => {
+                    LOWER_BOUND = min;
+                    UPPER_BOUND = max;
+                }
+                _ => panic!("[ERROR] invalid bounds: min > max "),
             },
-            _ => panic!("[ERROR] invalid bounds: min > max "),
-        },
+        }
+        println!(
+            "[INFO] using interval bounds: [{}, {}]",
+            LOWER_BOUND, UPPER_BOUND
+        );
     }
 }
 
@@ -87,7 +105,7 @@ fn main() {
     let ast = parse(&source).expect("[ERROR] failed to parse the program");
 
     if opts.check_interval {
-        set_min_max_interval(&opts);
+        set_min_max_interval(&opts, &ast);
         run_abstract::<Interval>(&ast);
     }
 

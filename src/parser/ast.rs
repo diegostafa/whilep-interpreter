@@ -39,6 +39,7 @@ pub enum Statement {
 pub enum ArithmeticExprError {
     DivByZero,
     InvalidIntervalBounds,
+    VariableNotFound,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +70,74 @@ pub enum BooleanExpr {
     NumGtEq(Box<ArithmeticExpr>, Box<ArithmeticExpr>),
 }
 
+impl Statement {
+    pub fn get_max_number(&self) -> Option<i64> {
+        match self.clone() {
+            Statement::Skip => None,
+            Statement::Chain(s1, s2) => max!(s1.get_max_number(), s2.get_max_number()),
+            Statement::Assignment { var: _, val } => val.get_max_number(),
+            Statement::If { cond, s1, s2 } => {
+                max!(
+                    cond.get_max_number(),
+                    s1.get_max_number(),
+                    s2.get_max_number()
+                )
+            }
+            Statement::While {
+                cond,
+                body,
+                delay: _,
+            } => {
+                max!(cond.get_max_number(), body.get_max_number())
+            }
+            Statement::RepeatUntil {
+                body,
+                cond,
+                delay: _,
+            } => {
+                max!(cond.get_max_number(), body.get_max_number())
+            }
+        }
+    }
+}
+
+impl ArithmeticExpr {
+    pub fn is_same(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ArithmeticExpr::Number(a), ArithmeticExpr::Number(b)) => a == b,
+            (ArithmeticExpr::Variable(a), ArithmeticExpr::Variable(b)) => a == b,
+
+            (ArithmeticExpr::Add(a1, a2), ArithmeticExpr::Add(b1, b2))
+            | (ArithmeticExpr::Mul(a1, a2), ArithmeticExpr::Mul(b1, b2)) => {
+                (a1.is_same(b1) && a2.is_same(b2)) || (a1.is_same(b2) && a2.is_same(b1))
+            }
+
+            (ArithmeticExpr::Sub(a1, a2), ArithmeticExpr::Sub(b1, b2))
+            | (ArithmeticExpr::Div(a1, a2), ArithmeticExpr::Div(b1, b2)) => {
+                a1.is_same(b1) && a2.is_same(b2)
+            }
+
+            _ => false,
+        }
+    }
+
+    pub fn get_max_number(&self) -> Option<i64> {
+        match self.clone() {
+            ArithmeticExpr::Number(Integer::Value(n)) => Some(n.abs() + 1),
+
+            ArithmeticExpr::Interval(a1, a2)
+            | ArithmeticExpr::Add(a1, a2)
+            | ArithmeticExpr::Sub(a1, a2)
+            | ArithmeticExpr::Mul(a1, a2)
+            | ArithmeticExpr::Div(a1, a2) => {
+                max!(a1.get_max_number(), a2.get_max_number())
+            }
+
+            _ => None,
+        }
+    }
+}
+
 impl BooleanExpr {
     pub fn negate(&self) -> BooleanExpr {
         match self.clone() {
@@ -92,81 +161,15 @@ impl BooleanExpr {
         }
     }
 
-    pub fn get_max_number_or(&self, curr_max: i64) -> i64 {
+    pub fn get_max_number(&self) -> Option<i64> {
         match self.clone() {
             BooleanExpr::NumEq(a1, a2)
             | BooleanExpr::NumNotEq(a1, a2)
             | BooleanExpr::NumLt(a1, a2)
             | BooleanExpr::NumGt(a1, a2)
             | BooleanExpr::NumLtEq(a1, a2)
-            | BooleanExpr::NumGtEq(a1, a2) => {
-                max!(
-                    a1.get_max_number_or(curr_max),
-                    a2.get_max_number_or(curr_max)
-                ) + 1
-            }
-            _ => curr_max,
-        }
-    }
-}
-
-impl Statement {
-    pub fn get_max_number_or(&self, curr_max: i64) -> i64 {
-        match self.clone() {
-            Statement::Skip => curr_max,
-            Statement::Chain(s1, s2) => max!(
-                s1.get_max_number_or(curr_max),
-                s2.get_max_number_or(curr_max)
-            ),
-            Statement::Assignment { var: _, val } => val.get_max_number_or(curr_max),
-            Statement::If { cond, s1, s2 } => {
-                max!(
-                    cond.get_max_number_or(curr_max),
-                    s1.get_max_number_or(curr_max),
-                    s2.get_max_number_or(curr_max)
-                )
-            }
-            Statement::While {
-                cond,
-                body,
-                delay: _,
-            } => {
-                max!(
-                    cond.get_max_number_or(curr_max),
-                    body.get_max_number_or(curr_max)
-                )
-            }
-            Statement::RepeatUntil {
-                body,
-                cond,
-                delay: _,
-            } => {
-                max!(
-                    cond.get_max_number_or(curr_max),
-                    body.get_max_number_or(curr_max)
-                )
-            }
-        }
-    }
-}
-
-impl ArithmeticExpr {
-    pub fn get_max_number_or(&self, curr_max: i64) -> i64 {
-        match self.clone() {
-            ArithmeticExpr::Number(Integer::Value(n)) => max!(n.abs(), curr_max),
-
-            ArithmeticExpr::Interval(a1, a2)
-            | ArithmeticExpr::Add(a1, a2)
-            | ArithmeticExpr::Sub(a1, a2)
-            | ArithmeticExpr::Mul(a1, a2)
-            | ArithmeticExpr::Div(a1, a2) => {
-                max!(
-                    a1.get_max_number_or(curr_max),
-                    a2.get_max_number_or(curr_max)
-                )
-            }
-
-            _ => curr_max,
+            | BooleanExpr::NumGtEq(a1, a2) => max!(a1.get_max_number(), a2.get_max_number()),
+            _ => None,
         }
     }
 }
@@ -216,25 +219,6 @@ impl fmt::Display for BooleanExpr {
             BooleanExpr::NumGt(a1, a2) => write!(f, "({} > {})", a1, a2),
             BooleanExpr::NumLtEq(a1, a2) => write!(f, "({} <= {})", a1, a2),
             BooleanExpr::NumGtEq(a1, a2) => write!(f, "({} >= {})", a1, a2),
-        }
-    }
-}
-
-impl PartialEq for ArithmeticExpr {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (ArithmeticExpr::Number(a), ArithmeticExpr::Number(b)) => a == b,
-            (ArithmeticExpr::Variable(a), ArithmeticExpr::Variable(b)) => a == b,
-
-            (ArithmeticExpr::Add(a1, a2), ArithmeticExpr::Add(b1, b2))
-            | (ArithmeticExpr::Mul(a1, a2), ArithmeticExpr::Mul(b1, b2)) => {
-                (a1 == b1 && a2 == b2) || (a1 == b2 && a2 == b1)
-            }
-
-            (ArithmeticExpr::Sub(a1, a2), ArithmeticExpr::Sub(b1, b2))
-            | (ArithmeticExpr::Div(a1, a2), ArithmeticExpr::Div(b1, b2)) => a1 == b1 && a2 == b2,
-
-            _ => false,
         }
     }
 }

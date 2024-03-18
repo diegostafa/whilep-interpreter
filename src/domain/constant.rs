@@ -16,9 +16,9 @@ pub enum Constant {
 impl Lattice for Constant {
     const TOP: Self = Constant::Any;
     const BOT: Self = Constant::None;
-    const UNIT: Self = Constant::Value(Integer::Value(1));
+    const UNIT: Self = Constant::Value(ONE);
 
-    fn union(&self, other: &Self) -> Self {
+    fn lub(&self, other: &Self) -> Self {
         match (self, other) {
             _ if self == other => *self,
             (_, Constant::None) => *self,
@@ -27,7 +27,7 @@ impl Lattice for Constant {
         }
     }
 
-    fn intersection(&self, other: &Self) -> Self {
+    fn glb(&self, other: &Self) -> Self {
         match (self, other) {
             _ if self == other => *self,
             (_, Constant::Any) => *self,
@@ -37,11 +37,11 @@ impl Lattice for Constant {
     }
 
     fn widen(&self, other: &Self) -> Self {
-        self.union(other)
+        self.lub(other)
     }
 
     fn narrow(&self, other: &Self) -> Self {
-        self.intersection(other)
+        self.glb(other)
     }
 }
 
@@ -49,7 +49,15 @@ impl Domain for Constant {
     fn eval_specific_aexpr(expr: &ArithmeticExpr, state: &State<Self>) -> (Self, State<Self>) {
         match expr {
             ArithmeticExpr::Number(c) => (Constant::Value(*c), state.clone()),
-            ArithmeticExpr::Interval(_, _) => (Constant::Any, state.clone()),
+            ArithmeticExpr::Interval(a1, a2) => {
+                let (a1_val, new_state) = Self::eval_aexpr(a1, state);
+                let (a2_val, new_state) = Self::eval_aexpr(a2, &new_state);
+                match a1_val {
+                    _ if a1_val == a2_val => (a1_val, new_state),
+                    _ if a1_val > a2_val => (Constant::None, new_state),
+                    _ => (Constant::Any, new_state),
+                }
+            }
             _ => unreachable!(),
         }
     }
@@ -71,7 +79,6 @@ impl Domain for Constant {
             BooleanExpr::NumLt(a1, a2) => {
                 let (lhs, new_state) = Self::eval_aexpr(a1, &state);
                 let (rhs, new_state) = Self::eval_aexpr(a2, &new_state);
-                println!("{} < {}", lhs, rhs);
                 match (lhs, rhs) {
                     (Constant::None, _) | (_, Constant::None) => State::Bottom,
                     (Constant::Any, _) | (_, Constant::Any) => new_state,
@@ -132,11 +139,10 @@ impl ops::Mul<Constant> for Constant {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self {
-        let zero = Integer::Value(0);
         match (self, other) {
             (Constant::None, _) | (_, Constant::None) => Constant::None,
-            (Constant::Value(a), Constant::Value(b)) if a == zero || b == zero => {
-                Constant::Value(zero)
+            (Constant::Value(a), Constant::Value(b)) if a == ZERO || b == ZERO => {
+                Constant::Value(ZERO)
             }
             (Constant::Value(a), Constant::Value(b)) => Constant::Value(a * b),
             (Constant::Any, _) | (_, Constant::Any) => Constant::Any,
@@ -148,12 +154,11 @@ impl ops::Div<Constant> for Constant {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
-        let zero = Integer::Value(0);
         match (self, other) {
             (Constant::None, _) | (_, Constant::None) => Constant::None,
             (Constant::Any, _) | (_, Constant::Any) => Constant::Any,
-            (Constant::Value(_), Constant::Value(b)) if b == zero => Constant::None,
-            (Constant::Value(a), Constant::Value(_)) if a == zero => Constant::Value(zero),
+            (Constant::Value(_), Constant::Value(b)) if b == ZERO => Constant::None,
+            (Constant::Value(a), Constant::Value(_)) if a == ZERO => Constant::Value(ZERO),
             (Constant::Value(a), Constant::Value(b)) => Constant::Value(a / b),
         }
     }

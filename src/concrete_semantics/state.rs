@@ -1,11 +1,11 @@
-use crate::{types::integer::*, Identifier};
+use crate::{types::integer::*, ArithmeticExprError, Identifier};
 use std::collections::HashMap;
 
 pub type State = HashMap<Identifier, Integer>;
 
 pub trait StateOperations {
     fn new() -> State;
-    fn read(&self, var: &Identifier) -> Integer;
+    fn read(&self, var: &Identifier) -> Result<Integer, ArithmeticExprError>;
     fn put(&self, var: &Identifier, val: Integer) -> State;
     fn pretty_print(&self);
 }
@@ -15,10 +15,11 @@ impl StateOperations for State {
         HashMap::new()
     }
 
-    fn read(&self, var: &Identifier) -> Integer {
-        *self
-            .get(var)
-            .unwrap_or(&random_integer_between(Integer::NegInf, Integer::PosInf))
+    fn read(&self, var: &Identifier) -> Result<Integer, ArithmeticExprError> {
+        match self.get(var) {
+            Some(val) => Ok(*val),
+            None => Err(ArithmeticExprError::VariableNotFound),
+        }
     }
 
     fn put(&self, var: &Identifier, val: Integer) -> State {

@@ -7,26 +7,47 @@ use crate::parser::ast::*;
 // --- type aliases
 
 pub type StateFunction<'a, T> = Box<dyn Fn(State<T>) -> (State<T>, Invariant<T>) + 'a>;
-pub type LoopIteration<'a, T> = Box<dyn Fn(&State<T>) -> (State<T>, Invariant<T>) + 'a>;
+pub type LoopIteration<'a, T> = Box<dyn Fn(&State<T>) -> State<T> + 'a>;
 
 // --- ast denotation
 
 pub fn denote_stmt<'a, T: Domain + 'a>(stmt: Statement) -> StateFunction<'a, T> {
     match stmt.clone() {
         Statement::Skip => id(),
+
         Statement::Chain(s1, s2) => compose(denote_stmt(*s1), denote_stmt(*s2)),
+
         Statement::Assignment { var, val } => state_update(var, *val),
+
         Statement::If { cond, s1, s2 } => conditional(*cond, denote_stmt(*s1), denote_stmt(*s2)),
-        Statement::While { cond, body, delay } => fix_while(
-            *cond.clone(),
-            denote_stmt(*body),
-            delay.unwrap_or(stmt.get_max_number_or(0)),
-        ),
-        Statement::RepeatUntil {
-            body: _,
-            cond: _,
-            delay: _,
-        } => todo!(),
+
+        Statement::While { cond, body, delay } => {
+            let body = denote_stmt(*body);
+
+            Box::new(move |state| {
+                let f: LoopIteration<T> = Box::new(|prev_state: &State<T>| {
+                    let cond_state = T::eval_bexpr(&cond, &prev_state);
+                    let body_state = body(cond_state).0;
+                    state.lub(&body_state)
+                });
+
+                while_semantic(
+                    f,
+                    &cond,
+                    &body,
+                    delay.unwrap_or(stmt.get_max_number().unwrap_or(0)),
+                )
+            })
+        }
+
+        Statement::RepeatUntil { body, cond, delay } => denote_stmt(Statement::Chain(
+            body.clone(),
+            Box::new(Statement::While {
+                cond: Box::new(cond.negate()),
+                body: Box::new(*body),
+                delay: delay,
+            }),
+        )),
     }
 }
 
@@ -65,7 +86,7 @@ fn conditional<'a, T: Domain + 'a>(
         let el_state = T::eval_bexpr(&cond.negate(), &state);
         let (s1_state, s1_inv) = s1(if_state.clone());
         let (s2_state, s2_inv) = s2(el_state.clone());
-        let end_state = s1_state.union(&s2_state);
+        let end_state = s1_state.lub(&s2_state);
         (
             end_state.clone(),
             concat(&[
@@ -79,69 +100,57 @@ fn conditional<'a, T: Domain + 'a>(
     })
 }
 
-fn fix_while<'a, T: Domain + 'a>(
-    cond: BooleanExpr,
-    body: StateFunction<'a, T>,
+fn while_semantic<T: Domain>(
+    f: LoopIteration<T>,
+    cond: &BooleanExpr,
+    body: &StateFunction<T>,
     delay: i64,
-) -> StateFunction<'a, T> {
-    Box::new(move |state| {
-        let f = Box::new(|prev_state: &State<T>| {
-            let cond_state = T::eval_bexpr(&cond, &prev_state);
-            let (body_state, body_inv) = body(cond_state);
-            (state.union(&body_state), body_inv)
-        });
+) -> (State<T>, Invariant<T>) {
+    let loop_inv = fix_wide(&f, State::Bottom, delay);
+    let loop_inv = fix_narr(&f, loop_inv);
 
-        let (loop_inv, _) = fix_wide(f.clone(), State::Bottom, delay);
-        let (loop_inv, body_inv) = fix_narr(f, loop_inv, delay);
+    let cond_state = T::eval_bexpr(&cond, &loop_inv);
+    let body_state = body(cond_state.clone()).1;
+    let exit_state = T::eval_bexpr(&cond.negate(), &loop_inv);
 
-        let cond_state = T::eval_bexpr(&cond, &loop_inv);
-        let post_cond = T::eval_bexpr(&cond.negate(), &loop_inv);
-
-        (
-            post_cond.clone(),
-            concat(&[vec![loop_inv], vec![cond_state], body_inv, vec![post_cond]]),
-        )
-    })
+    (
+        exit_state.clone(),
+        concat(&[
+            vec![loop_inv],
+            vec![cond_state],
+            body_state,
+            vec![exit_state],
+        ]),
+    )
 }
 
-fn fix_wide<T: Domain>(
-    f: LoopIteration<T>,
-    mut prev_state: State<T>,
-    mut delay: i64,
-) -> (State<T>, Invariant<T>) {
+fn fix_wide<T: Domain>(f: &LoopIteration<T>, init_state: State<T>, mut delay: i64) -> State<T> {
+    let mut prev_state = init_state;
     loop {
-        let (mut curr_state, inv) = f(&prev_state);
+        let mut curr_state = f(&prev_state);
 
-        if delay <= 0 {
+        if delay == 0 {
             curr_state = prev_state.widen(&curr_state);
         } else {
             delay -= 1;
         }
 
         if prev_state == curr_state {
-            break (curr_state, inv);
+            break curr_state;
         }
 
         prev_state = curr_state;
     }
 }
 
-fn fix_narr<T: Domain>(
-    f: LoopIteration<T>,
-    mut prev_state: State<T>,
-    mut delay: i64,
-) -> (State<T>, Invariant<T>) {
+fn fix_narr<T: Domain>(f: &LoopIteration<T>, init_state: State<T>) -> State<T> {
+    let mut prev_state = init_state;
     loop {
-        let (mut curr_state, inv) = f(&prev_state);
-
-        if delay <= 0 {
-            curr_state = prev_state.narrow(&curr_state);
-        } else {
-            delay -= 1;
-        }
+        let mut curr_state = f(&prev_state);
+        curr_state = prev_state.narrow(&curr_state);
 
         if prev_state == curr_state {
-            break (curr_state, inv);
+            break curr_state;
         }
 
         prev_state = curr_state;

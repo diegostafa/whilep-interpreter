@@ -22,45 +22,52 @@ pub enum Interval {
 }
 
 impl Interval {
-    pub fn add_min(&self, val: Integer) -> Self {
-        match *self {
-            Interval::Empty => Interval::Empty,
-            Interval::Range(a, b) => Interval::Range(a + val, b),
+    pub fn min(&self) -> Option<Integer> {
+        match self {
+            Interval::Empty => None,
+            Interval::Range(a, _) => Some(*a),
         }
     }
 
-    pub fn add_max(&self, val: Integer) -> Self {
+    pub fn max(&self) -> Option<Integer> {
+        match self {
+            Interval::Empty => None,
+            Interval::Range(_, b) => Some(*b),
+        }
+    }
+
+    pub fn open_min(&self) -> Self {
         match *self {
             Interval::Empty => Interval::Empty,
-            Interval::Range(a, b) => Interval::Range(a, b + val),
+            Interval::Range(_, b) => Interval::Range(Integer::NegInf, b),
+        }
+    }
+
+    pub fn open_max(&self) -> Self {
+        match *self {
+            Interval::Empty => Interval::Empty,
+            Interval::Range(a, _) => Interval::Range(a, Integer::PosInf),
         }
     }
 
     pub fn check_bounds(&self) -> Self {
-        self.check_bound_left().check_bound_right()
-    }
-
-    fn check_bound_left(&self) -> Self {
         unsafe {
-            match *self {
+            match self.clone() {
                 Interval::Empty => Interval::Empty,
-                _ if LOWER_BOUND == Integer::NegInf => *self,
+                _ if self.min() == self.max() => *self,
                 Interval::Range(a, b) => {
-                    let min = if a < LOWER_BOUND { Integer::NegInf } else { a };
-                    Interval::Range(min, b)
-                }
-            }
-        }
-    }
+                    let min = match a {
+                        _ if a < LOWER_BOUND => Integer::NegInf,
+                        _ if a > UPPER_BOUND => UPPER_BOUND,
+                        _ => a,
+                    };
+                    let max = match b {
+                        _ if b > UPPER_BOUND => Integer::PosInf,
+                        _ if b < LOWER_BOUND => LOWER_BOUND,
+                        _ => b,
+                    };
 
-    fn check_bound_right(&self) -> Self {
-        unsafe {
-            match *self {
-                Interval::Empty => Interval::Empty,
-                _ if UPPER_BOUND == Integer::PosInf => *self,
-                Interval::Range(a, b) => {
-                    let max = if b > UPPER_BOUND { Integer::PosInf } else { b };
-                    Interval::Range(a, max)
+                    Interval::Range(min, max)
                 }
             }
         }
@@ -74,7 +81,7 @@ impl Domain for Interval {
             ArithmeticExpr::Interval(a1, a2) => {
                 let (a1_val, a1_state) = Self::eval_aexpr(a1, state);
                 let (a2_val, a2_state) = Self::eval_aexpr(a2, &a1_state);
-                (a1_val.union(&a2_val), a2_state)
+                (a1_val.lub(&a2_val), a2_state)
             }
             _ => unreachable!(),
         };
@@ -85,25 +92,24 @@ impl Domain for Interval {
     fn eval_specific_bexpr(cmp_expr: &BooleanExpr, state: &State<Self>) -> State<Self> {
         match cmp_expr {
             BooleanExpr::NumNotEq(a1, a2) => Self::eval_aexpr(a2, &Self::eval_aexpr(a1, state).1).1,
-            BooleanExpr::NumLt(a1, a2) => {
-                let (ltree, _) = ExpressionTree::build(a1, state);
-                let (rtree, _) = ExpressionTree::build(a2, state);
-                let (i1, i2) = (ltree.get_value(), rtree.get_value());
-                let one = Integer::Value(1);
-                let lhs = i1.intersection(&i2.add_min(Integer::NegInf).add_max(-one));
-                let rhs = i2.intersection(&i1.add_max(Integer::PosInf).add_min(one));
 
-                match (lhs, rhs) {
+            BooleanExpr::NumLt(a1, a2) => {
+                let a1_tree = ExpressionTree::build(a1, state).0;
+                let a2_tree = ExpressionTree::build(a2, state).0;
+                let (i1, i2) = (a1_tree.value(), a2_tree.value());
+
+                let l_intersection = i1.glb(&(i2.open_min() - ONE));
+                let r_intersection = i2.glb(&(i1.open_max() + ONE));
+
+                match (l_intersection, r_intersection) {
                     (Interval::Empty, _) | (_, Interval::Empty) => State::Bottom,
                     _ => {
-                        let new_state = state
-                            .refine_expression_tree(&ltree, lhs)
-                            .refine_expression_tree(&rtree, rhs);
+                        let new_state = a1_tree.refine(l_intersection, state.clone());
+                        let new_state = a2_tree.refine(r_intersection, new_state);
 
-                        // apply side effects
-                        let a1_state = Self::eval_aexpr(a1, &new_state).1;
-                        let a2_state = Self::eval_aexpr(a2, &a1_state).1;
-                        a2_state
+                        let new_state = Self::eval_aexpr(a1, &new_state).1;
+                        let new_state = Self::eval_aexpr(a2, &new_state).1;
+                        new_state
                     }
                 }
             }
@@ -115,9 +121,9 @@ impl Domain for Interval {
 impl Lattice for Interval {
     const TOP: Self = Interval::Range(Integer::NegInf, Integer::PosInf);
     const BOT: Self = Interval::Empty;
-    const UNIT: Self = Interval::Range(Integer::Value(1), Integer::Value(1));
+    const UNIT: Self = Interval::Range(ONE, ONE);
 
-    fn union(&self, other: &Self) -> Self {
+    fn lub(&self, other: &Self) -> Self {
         match (*self, *other) {
             (a, Interval::Empty) => a,
             (Interval::Empty, b) => b,
@@ -128,7 +134,7 @@ impl Lattice for Interval {
         .check_bounds()
     }
 
-    fn intersection(&self, other: &Self) -> Self {
+    fn glb(&self, other: &Self) -> Self {
         match (*self, *other) {
             (Interval::Empty, _) | (_, Interval::Empty) => Interval::Empty,
             (Interval::Range(a, b), Interval::Range(c, d)) => {
@@ -142,19 +148,15 @@ impl Lattice for Interval {
     }
 
     fn widen(&self, other: &Self) -> Self {
-        // if bounds are defined, apply union
-        unsafe {
-            if LOWER_BOUND != Integer::NegInf || UPPER_BOUND != Integer::PosInf {
-                return self.union(other);
-            }
-        }
+        let lb = max!(Integer::NegInf, unsafe { LOWER_BOUND });
+        let ub = min!(Integer::PosInf, unsafe { UPPER_BOUND });
 
         match (*self, *other) {
             (a, Interval::Empty) => a,
             (Interval::Empty, b) => b,
             (Interval::Range(a, b), Interval::Range(c, d)) => {
-                let min = if a <= c { a } else { Integer::NegInf };
-                let max = if b >= d { b } else { Integer::PosInf };
+                let min = if a <= c { a } else { lb };
+                let max = if b >= d { b } else { ub };
                 Interval::Range(min, max)
             }
         }
@@ -230,6 +232,7 @@ impl ops::Neg for Interval {
             Interval::Empty => self,
             Interval::Range(a, b) => Interval::Range(-b, -a),
         }
+        .check_bounds()
     }
 }
 
@@ -241,6 +244,7 @@ impl ops::Add<Interval> for Interval {
             (Interval::Range(a, b), Interval::Range(c, d)) => Interval::Range(a + c, b + d),
             _ => Interval::Empty,
         }
+        .check_bounds()
     }
 }
 
@@ -252,6 +256,7 @@ impl ops::Sub<Interval> for Interval {
             (Interval::Range(a, b), Interval::Range(c, d)) => Interval::Range(a - d, b - c),
             _ => Interval::Empty,
         }
+        .check_bounds()
     }
 }
 
@@ -269,6 +274,7 @@ impl ops::Mul<Interval> for Interval {
             }
             _ => Interval::Empty,
         }
+        .check_bounds()
     }
 }
 
@@ -278,20 +284,53 @@ impl ops::Div<Interval> for Interval {
     fn div(self, other: Self) -> Self {
         match (self, other) {
             (Interval::Range(a, b), Interval::Range(c, d)) => {
-                let one = Integer::Value(1);
+                let one = ONE;
 
                 match (c, d) {
                     _ if c >= one => Interval::Range(min!(a / c, a / d), max!(b / c, b / d)),
                     _ if d <= -one => Interval::Range(min!(b / c, b / d), max!(a / c, a / d)),
                     _ => {
                         let semibound = Interval::Range(one, Integer::PosInf);
-                        let pos = self / other.intersection(&semibound);
-                        let neg = self / other.intersection(&semibound.neg());
-                        pos.union(&neg)
+                        let pos = self / other.glb(&semibound);
+                        let neg = self / other.glb(&semibound.neg());
+                        pos.lub(&neg)
                     }
                 }
             }
             _ => Interval::Empty,
         }
+        .check_bounds()
+    }
+}
+
+impl ops::Add<Integer> for Interval {
+    type Output = Self;
+
+    fn add(self, other: Integer) -> Self {
+        self + Interval::Range(other, other)
+    }
+}
+
+impl ops::Sub<Integer> for Interval {
+    type Output = Self;
+
+    fn sub(self, other: Integer) -> Self {
+        self - Interval::Range(other, other)
+    }
+}
+
+impl ops::Mul<Integer> for Interval {
+    type Output = Self;
+
+    fn mul(self, other: Integer) -> Self {
+        self * Interval::Range(other, other)
+    }
+}
+
+impl ops::Div<Integer> for Interval {
+    type Output = Self;
+
+    fn div(self, other: Integer) -> Self {
+        self / Interval::Range(other, other)
     }
 }

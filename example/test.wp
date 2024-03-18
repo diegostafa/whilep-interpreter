@@ -1,3 +1,4 @@
-x := 0;
-while (x < 100) do x++ done
 
+x:=1;
+y:=1;
+while (x < 5) @delay:0 do x++; y++ done

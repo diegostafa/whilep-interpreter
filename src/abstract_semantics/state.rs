@@ -1,5 +1,4 @@
 use crate::domain::domain::*;
-use crate::domain::expression_tree::*;
 use crate::domain::lattice::*;
 use crate::parser::ast::*;
 use std::collections::HashMap;
@@ -19,7 +18,7 @@ impl<T: Domain> State<T> {
     pub fn read(&self, var: &Identifier) -> T {
         match self {
             State::Bottom => T::BOT,
-            State::Just(state) => *state.get(var).unwrap_or(&T::TOP),
+            State::Just(state) => *state.get(var).unwrap_or(&T::BOT),
         }
     }
 
@@ -33,29 +32,6 @@ impl<T: Domain> State<T> {
             }
         }
     }
-
-    pub fn refine_expression_tree(&self, tree: &ExpressionTree<T>, refined_value: T) -> Self {
-        match tree {
-            ExpressionTree::Value(_) => self.clone(),
-            ExpressionTree::Variable(var, val) => self.put(var, val.intersection(&refined_value)),
-            ExpressionTree::Binop(val, op, l, r) => {
-                let c = val.intersection(&refined_value);
-                let a = l.get_value();
-                let b = r.get_value();
-
-                let (refined_a, refined_b) = match op {
-                    ArithmeticExpr::Add(_, _) => (c - b, c - a),
-                    ArithmeticExpr::Sub(_, _) => (c + b, a - c),
-                    ArithmeticExpr::Mul(_, _) => (c / b, c / a),
-                    ArithmeticExpr::Div(_, _) => (c * b, a / c),
-                    _ => unreachable!(),
-                };
-
-                self.refine_expression_tree(l, refined_a)
-                    .refine_expression_tree(r, refined_b)
-            }
-        }
-    }
 }
 
 impl<T: Domain> Lattice for State<T> {
@@ -63,18 +39,18 @@ impl<T: Domain> Lattice for State<T> {
     const BOT: Self = State::Bottom;
     const UNIT: Self = State::Bottom;
 
-    fn union(&self, other: &Self) -> Self {
+    fn lub(&self, other: &Self) -> Self {
         match (self, other) {
             (State::Bottom, _) => other.clone(),
             (_, State::Bottom) => self.clone(),
-            (State::Just(s1), State::Just(s2)) => point_wise_op(s1, s2, |a, b| a.union(&b)),
+            (State::Just(s1), State::Just(s2)) => point_wise_op(s1, s2, |a, b| a.lub(&b)),
         }
     }
 
-    fn intersection(&self, other: &Self) -> Self {
+    fn glb(&self, other: &Self) -> Self {
         match (self, other) {
             (State::Bottom, _) | (_, State::Bottom) => State::Bottom,
-            (State::Just(s1), State::Just(s2)) => point_wise_op(s1, s2, |a, b| a.intersection(&b)),
+            (State::Just(s1), State::Just(s2)) => point_wise_op(s1, s2, |a, b| a.glb(&b)),
         }
     }
 

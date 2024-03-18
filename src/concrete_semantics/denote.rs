@@ -59,7 +59,10 @@ pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> IntResult {
                 _ => Err(ArithmeticExprError::InvalidIntervalBounds),
             }
         }
-        ArithmeticExpr::Variable(var) => Ok((state.read(var), state.clone())),
+        ArithmeticExpr::Variable(var) => match state.read(var) {
+            Ok(val) => Ok((val, state.clone())),
+            Err(err) => Err(err),
+        },
         ArithmeticExpr::Add(a1, a2) => binop_aexpr(|a, b| a + b, a1, a2, state),
         ArithmeticExpr::Sub(a1, a2) => binop_aexpr(|a, b| a - b, a1, a2, state),
         ArithmeticExpr::Mul(a1, a2) => binop_aexpr(|a, b| a * b, a1, a2, state),
@@ -67,18 +70,18 @@ pub fn eval_aexpr(expr: &ArithmeticExpr, state: &State) -> IntResult {
             let (a1_val, new_state) = eval_aexpr(a1, &state)?;
             let (a2_val, new_state) = eval_aexpr(a2, &new_state)?;
             match a2_val {
-                Integer::Value(0) => Err(ArithmeticExprError::DivByZero),
+                ZERO => Err(ArithmeticExprError::DivByZero),
                 _ => Ok((a1_val / a2_val, new_state)),
             }
         }
-        ArithmeticExpr::PostIncrement(var) => {
-            let val = state.read(var);
-            Ok((val, state.put(var, val + 1)))
-        }
-        ArithmeticExpr::PostDecrement(var) => {
-            let val = state.read(var);
-            Ok((val, state.put(var, val - 1)))
-        }
+        ArithmeticExpr::PostIncrement(var) => match state.read(var) {
+            Ok(val) => Ok((val, state.put(var, val + 1))),
+            Err(err) => Err(err),
+        },
+        ArithmeticExpr::PostDecrement(var) => match state.read(var) {
+            Ok(val) => Ok((val, state.put(var, val - 1))),
+            Err(err) => Err(err),
+        },
     }
 }
 

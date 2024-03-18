@@ -12,10 +12,6 @@ pub enum ProgramPoint {
     WhileInv,
     WhileGuard(BooleanExpr),
     EndWhile(BooleanExpr),
-
-    Repeat,
-    UntilGuard(BooleanExpr),
-    EndRepeatUntil(BooleanExpr),
 }
 
 impl fmt::Display for ProgramPoint {
@@ -31,10 +27,6 @@ impl fmt::Display for ProgramPoint {
             ProgramPoint::WhileInv => write!(f, "[while-inv]"),
             ProgramPoint::WhileGuard(b) => write!(f, "[while-guard] {}", b),
             ProgramPoint::EndWhile(b) => write!(f, "[end-while] {}", b),
-
-            ProgramPoint::Repeat => write!(f, "[repeat]"),
-            ProgramPoint::UntilGuard(b) => write!(f, "[until-guard] {}", b),
-            ProgramPoint::EndRepeatUntil(b) => write!(f, "[end-repeat] {}", b),
         }
     }
 }
@@ -63,10 +55,11 @@ pub fn get_program_points(stmt: Statement) -> Vec<ProgramPoint> {
         ]),
 
         RepeatUntil { body, cond, .. } => concat(vec![
-            vec![ProgramPoint::Repeat],
+            get_program_points(*body.clone()),
+            vec![ProgramPoint::WhileInv],
+            vec![ProgramPoint::WhileGuard(*cond.clone())],
             get_program_points(*body),
-            vec![ProgramPoint::UntilGuard(cond.negate())],
-            vec![ProgramPoint::EndRepeatUntil(*cond.clone())],
+            vec![ProgramPoint::EndWhile(cond.negate())],
         ]),
     }
 }

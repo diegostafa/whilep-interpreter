@@ -6,6 +6,9 @@ use std::{
     str::FromStr,
 };
 
+pub const ZERO: Integer = Integer::Value(0);
+pub const ONE: Integer = Integer::Value(1);
+
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
 pub enum Integer {
     NegInf,
@@ -14,7 +17,7 @@ pub enum Integer {
 }
 
 impl Integer {
-    pub fn get_value(&self) -> i64 {
+    pub fn value(&self) -> i64 {
         match *self {
             Integer::NegInf => std::i64::MIN,
             Integer::Value(v) => v,
@@ -109,16 +112,15 @@ impl ops::Div<Integer> for Integer {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
-        let zero = Integer::Value(0);
         match (self, other) {
-            (a, _) if a == zero => zero,
-            (_, Integer::PosInf) | (_, Integer::NegInf) => zero,
-            (Integer::NegInf, b) if b > zero => Integer::NegInf,
-            (Integer::NegInf, b) if b < zero => Integer::PosInf,
-            (Integer::PosInf, b) if b < zero => Integer::NegInf,
-            (Integer::PosInf, b) if b > zero => Integer::NegInf,
-            (Integer::Value(a), b) if a > 0 && b == zero => Integer::PosInf,
-            (Integer::Value(a), b) if a < 0 && b == zero => Integer::NegInf,
+            (a, _) if a == ZERO => ZERO,
+            (_, Integer::PosInf) | (_, Integer::NegInf) => ZERO,
+            (Integer::NegInf, b) if b > ZERO => Integer::NegInf,
+            (Integer::NegInf, b) if b < ZERO => Integer::PosInf,
+            (Integer::PosInf, b) if b < ZERO => Integer::NegInf,
+            (Integer::PosInf, b) if b > ZERO => Integer::NegInf,
+            (Integer::Value(a), b) if a > 0 && b == ZERO => Integer::PosInf,
+            (Integer::Value(a), b) if a < 0 && b == ZERO => Integer::NegInf,
             (Integer::Value(a), Integer::Value(b)) => Integer::Value(a / b),
             _ => unreachable!(),
         }
@@ -174,19 +176,5 @@ pub fn random_integer_between(min: Integer, max: Integer) -> Integer {
         panic!("[ERROR] invalid interval: [{}, {}]", min, max);
     }
 
-    let rng: f64 = rand::thread_rng().gen();
-
-    let min = match min {
-        Integer::Value(v) => v,
-        Integer::NegInf => std::i64::MIN / 2,
-        Integer::PosInf => std::i64::MAX / 2,
-    };
-
-    let max = match max {
-        Integer::Value(v) => v,
-        Integer::NegInf => std::i64::MIN / 2,
-        Integer::PosInf => std::i64::MAX / 2,
-    };
-
-    Integer::Value((rng * (max - min) as f64) as i64 + min)
+    Integer::Value(rand::thread_rng().gen_range(min.value()..=max.value()))
 }

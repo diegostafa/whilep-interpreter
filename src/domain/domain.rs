@@ -46,20 +46,20 @@ pub trait Domain: DomainProperties + Lattice + Arithmetic {
                 let lhs2 = Self::eval_bexpr(b2, &lhs1);
                 let rhs2 = Self::eval_bexpr(b2, state);
                 let rhs1 = Self::eval_bexpr(b1, &rhs2);
-                lhs2.intersection(&rhs1)
+                lhs2.glb(&rhs1)
             }
             BooleanExpr::Or(b1, b2) => {
                 let lhs1 = Self::eval_bexpr(b1, state);
                 let lhs2 = Self::eval_bexpr(b2, &lhs1);
                 let rhs2 = Self::eval_bexpr(b2, state);
                 let rhs1 = Self::eval_bexpr(b1, &rhs2);
-                lhs2.union(&rhs1)
+                lhs2.lub(&rhs1)
             }
 
             BooleanExpr::NumLtEq(a1, a2) => {
                 let lt = Self::eval_bexpr(&BooleanExpr::NumLt(a1.clone(), a2.clone()), state);
                 let eq = Self::eval_bexpr(&BooleanExpr::NumEq(a1.clone(), a2.clone()), state);
-                lt.union(&eq)
+                lt.lub(&eq)
             }
             BooleanExpr::NumGt(a1, a2) => {
                 Self::eval_bexpr(&BooleanExpr::NumLt(a2.clone(), a1.clone()), state)
@@ -69,27 +69,24 @@ pub trait Domain: DomainProperties + Lattice + Arithmetic {
             }
 
             BooleanExpr::NumEq(a1, a2) => {
-                let (ltree, _) = ExpressionTree::build(a1, state);
-                let (rtree, _) = ExpressionTree::build(a2, state);
-                let (i1, i2) = (ltree.get_value(), rtree.get_value());
-                let intersection = i1.intersection(&i2);
+                let a1_tree = ExpressionTree::build(a1, state).0;
+                let a2_tree = ExpressionTree::build(a2, state).0;
+                let intersection = a1_tree.value().glb(&a2_tree.value());
 
                 match intersection == Self::BOT {
                     true => State::Bottom,
                     _ => {
-                        let new_state = state
-                            .refine_expression_tree(&ltree, intersection)
-                            .refine_expression_tree(&rtree, intersection);
+                        let new_state = a1_tree.refine(intersection, state.clone());
+                        let new_state = a2_tree.refine(intersection, new_state);
 
-                        // apply side effects with refined values
-                        let a1_state = Self::eval_aexpr(a1, &new_state).1;
-                        let a2_state = Self::eval_aexpr(a2, &a1_state).1;
-                        a2_state
+                        let new_state = Self::eval_aexpr(a1, &new_state).1;
+                        let new_state = Self::eval_aexpr(a2, &new_state).1;
+                        new_state
                     }
                 }
             }
 
-            BooleanExpr::NumNotEq(a1, a2) | BooleanExpr::NumLt(a1, a2) => match a1 == a2 {
+            BooleanExpr::NumNotEq(a1, a2) | BooleanExpr::NumLt(a1, a2) => match a1.is_same(a2) {
                 true => State::Bottom,
                 _ => Self::eval_specific_bexpr(expr, state),
             },
