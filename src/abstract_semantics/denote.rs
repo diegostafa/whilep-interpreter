@@ -21,22 +21,15 @@ pub fn denote_stmt<'a, T: Domain + 'a>(stmt: Statement) -> StateFunction<'a, T> 
 
         Statement::If { cond, s1, s2 } => conditional(*cond, denote_stmt(*s1), denote_stmt(*s2)),
 
-        Statement::While { cond, body, delay } => {
+        Statement::While { cond, body, .. } => {
             let body = denote_stmt(*body);
 
             Box::new(move |state| {
                 let f: LoopIteration<T> = Box::new(|prev_state: &State<T>| {
                     let cond_state = T::eval_bexpr(&cond, &prev_state);
-                    let body_state = body(cond_state).0;
-                    state.lub(&body_state)
+                    state.lub(&body(cond_state).0)
                 });
-
-                while_semantic(
-                    f,
-                    &cond,
-                    &body,
-                    delay.unwrap_or(stmt.get_max_number().unwrap_or(0)),
-                )
+                while_semantic(f, &cond, &body, get_loop_delay(&stmt))
             })
         }
 
@@ -106,8 +99,8 @@ fn while_semantic<T: Domain>(
     body: &StateFunction<T>,
     delay: i64,
 ) -> (State<T>, Invariant<T>) {
-    let loop_inv = fix_wide(&f, State::Bottom, delay);
-    let loop_inv = fix_narr(&f, loop_inv);
+    let loop_inv = fix(&f, |prev, curr| prev.widen(&curr), State::Bottom, delay);
+    let loop_inv = fix(&f, |prev, curr| prev.narrow(&curr), loop_inv, 0);
 
     let cond_state = T::eval_bexpr(&cond, &loop_inv);
     let body_state = body(cond_state.clone()).1;
@@ -124,30 +117,19 @@ fn while_semantic<T: Domain>(
     )
 }
 
-fn fix_wide<T: Domain>(f: &LoopIteration<T>, init_state: State<T>, mut delay: i64) -> State<T> {
-    let mut prev_state = init_state;
+fn fix<T: Domain>(
+    f: &LoopIteration<T>,
+    converge: fn(&State<T>, &State<T>) -> State<T>,
+    mut prev_state: State<T>,
+    mut delay: i64,
+) -> State<T> {
     loop {
         let mut curr_state = f(&prev_state);
 
-        if delay == 0 {
-            curr_state = prev_state.widen(&curr_state);
-        } else {
-            delay -= 1;
+        match delay == 0 {
+            true => curr_state = converge(&prev_state, &curr_state),
+            _ => delay -= 1,
         }
-
-        if prev_state == curr_state {
-            break curr_state;
-        }
-
-        prev_state = curr_state;
-    }
-}
-
-fn fix_narr<T: Domain>(f: &LoopIteration<T>, init_state: State<T>) -> State<T> {
-    let mut prev_state = init_state;
-    loop {
-        let mut curr_state = f(&prev_state);
-        curr_state = prev_state.narrow(&curr_state);
 
         if prev_state == curr_state {
             break curr_state;

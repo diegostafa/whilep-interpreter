@@ -10,6 +10,12 @@ pub fn parse(source: &str) -> Result<Statement, ParseError<usize, Token, &'stati
     whilep::StmtParser::new().parse(source)
 }
 
+pub enum ArithmeticExprError {
+    DivByZero,
+    InvalidIntervalBounds,
+    VariableNotFound,
+}
+
 #[derive(Debug, Clone)]
 pub enum Statement {
     Skip,
@@ -34,12 +40,6 @@ pub enum Statement {
         cond: Box<BooleanExpr>,
         delay: Option<i64>,
     },
-}
-
-pub enum ArithmeticExprError {
-    DivByZero,
-    InvalidIntervalBounds,
-    VariableNotFound,
 }
 
 #[derive(Debug, Clone)]
@@ -220,5 +220,26 @@ impl fmt::Display for BooleanExpr {
             BooleanExpr::NumLtEq(a1, a2) => write!(f, "({} <= {})", a1, a2),
             BooleanExpr::NumGtEq(a1, a2) => write!(f, "({} >= {})", a1, a2),
         }
+    }
+}
+
+impl fmt::Display for ArithmeticExprError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ArithmeticExprError::DivByZero => write!(f, "division by zero"),
+            ArithmeticExprError::InvalidIntervalBounds => write!(f, "invalid interval bounds"),
+            ArithmeticExprError::VariableNotFound => write!(f, "variable not found"),
+        }
+    }
+}
+
+// --- helpers
+
+pub fn get_loop_delay(stmt: &Statement) -> i64 {
+    match stmt {
+        Statement::While { delay, .. } | Statement::RepeatUntil { delay, .. } => {
+            delay.unwrap_or(stmt.get_max_number().unwrap_or(0))
+        }
+        _ => panic!("[ERROR] not a loop statement"),
     }
 }

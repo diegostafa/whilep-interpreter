@@ -25,8 +25,7 @@ fn run_concrete(ast: &Statement) {
     println!("[INFO] evaluating the concrete semantics");
     let state = induced_function(State::new());
     match state {
-        None => println!("[ERROR] Arithmetic expression error"),
-        Some(state) => {
+        Ok(Some(state)) => {
             let headers = vec!["#".to_string(), "Var".to_string(), "Val".to_string()];
             let rows = state
                 .iter()
@@ -36,6 +35,8 @@ fn run_concrete(ast: &Statement) {
 
             draw_table(headers, rows)
         }
+        Ok(None) => println!("[ERROR] Arithmetic expression error"),
+        Err(e) => println!("[ERROR] {}", e),
     }
 }
 

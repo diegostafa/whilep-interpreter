@@ -17,6 +17,7 @@ impl Lattice for Constant {
     const TOP: Self = Constant::Any;
     const BOT: Self = Constant::None;
     const UNIT: Self = Constant::Value(ONE);
+    const ZERO: Self = Constant::Value(ZERO);
 
     fn lub(&self, other: &Self) -> Self {
         match (self, other) {
@@ -37,11 +38,18 @@ impl Lattice for Constant {
     }
 
     fn widen(&self, other: &Self) -> Self {
-        self.lub(other)
+        other.clone()
     }
 
     fn narrow(&self, other: &Self) -> Self {
-        self.glb(other)
+        other.clone()
+    }
+
+    fn round(x: &Self) -> Self {
+        match *x {
+            Constant::None => Constant::None,
+            _ => Constant::Any,
+        }
     }
 }
 
@@ -141,11 +149,13 @@ impl ops::Mul<Constant> for Constant {
     fn mul(self, other: Self) -> Self {
         match (self, other) {
             (Constant::None, _) | (_, Constant::None) => Constant::None,
-            (Constant::Value(a), Constant::Value(b)) if a == ZERO || b == ZERO => {
+            (Constant::Value(a), Constant::Value(b)) => Constant::Value(a * b),
+            (Constant::Any, Constant::Value(a)) | (Constant::Value(a), Constant::Any)
+                if a == ZERO =>
+            {
                 Constant::Value(ZERO)
             }
-            (Constant::Value(a), Constant::Value(b)) => Constant::Value(a * b),
-            (Constant::Any, _) | (_, Constant::Any) => Constant::Any,
+            _ => Constant::Any,
         }
     }
 }
@@ -156,10 +166,10 @@ impl ops::Div<Constant> for Constant {
     fn div(self, other: Self) -> Self {
         match (self, other) {
             (Constant::None, _) | (_, Constant::None) => Constant::None,
-            (Constant::Any, _) | (_, Constant::Any) => Constant::Any,
-            (Constant::Value(_), Constant::Value(b)) if b == ZERO => Constant::None,
-            (Constant::Value(a), Constant::Value(_)) if a == ZERO => Constant::Value(ZERO),
+            (_, Constant::Value(b)) if b == ZERO => Constant::None,
+            (Constant::Value(a), _) if a == ZERO => Constant::Value(ZERO),
             (Constant::Value(a), Constant::Value(b)) => Constant::Value(a / b),
+            _ => Constant::Any,
         }
     }
 }

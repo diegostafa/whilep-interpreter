@@ -9,7 +9,7 @@ pub enum ProgramPoint {
     ElseGuard(BooleanExpr),
     EndIf,
 
-    WhileInv,
+    WhileInv { delay: i64 },
     WhileGuard(BooleanExpr),
     EndWhile(BooleanExpr),
 }
@@ -24,7 +24,7 @@ impl fmt::Display for ProgramPoint {
             ProgramPoint::ElseGuard(b) => write!(f, "[else-guard] {}", b),
             ProgramPoint::EndIf => write!(f, "[end-if]"),
 
-            ProgramPoint::WhileInv => write!(f, "[while-inv]"),
+            ProgramPoint::WhileInv { delay } => write!(f, "[while-inv] @delay:{}", delay),
             ProgramPoint::WhileGuard(b) => write!(f, "[while-guard] {}", b),
             ProgramPoint::EndWhile(b) => write!(f, "[end-while] {}", b),
         }
@@ -48,7 +48,9 @@ pub fn get_program_points(stmt: Statement) -> Vec<ProgramPoint> {
         ]),
 
         While { cond, body, .. } => concat(vec![
-            vec![ProgramPoint::WhileInv],
+            vec![ProgramPoint::WhileInv {
+                delay: get_loop_delay(&stmt),
+            }],
             vec![ProgramPoint::WhileGuard(*cond.clone())],
             get_program_points(*body),
             vec![ProgramPoint::EndWhile(cond.negate())],
@@ -56,7 +58,9 @@ pub fn get_program_points(stmt: Statement) -> Vec<ProgramPoint> {
 
         RepeatUntil { body, cond, .. } => concat(vec![
             get_program_points(*body.clone()),
-            vec![ProgramPoint::WhileInv],
+            vec![ProgramPoint::WhileInv {
+                delay: get_loop_delay(&stmt),
+            }],
             vec![ProgramPoint::WhileGuard(*cond.clone())],
             get_program_points(*body),
             vec![ProgramPoint::EndWhile(cond.negate())],

@@ -38,6 +38,7 @@ impl<T: Domain> Lattice for State<T> {
     const TOP: Self = State::Bottom;
     const BOT: Self = State::Bottom;
     const UNIT: Self = State::Bottom;
+    const ZERO: Self = State::Bottom;
 
     fn lub(&self, other: &Self) -> Self {
         match (self, other) {
@@ -67,6 +68,10 @@ impl<T: Domain> Lattice for State<T> {
             (State::Bottom, _) | (_, State::Bottom) => State::Bottom,
             (State::Just(s1), State::Just(s2)) => point_wise_op(s1, s2, |a, b| a.narrow(&b)),
         }
+    }
+
+    fn round(_: &Self) -> Self {
+        unreachable!()
     }
 }
 

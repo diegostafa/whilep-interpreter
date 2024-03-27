@@ -51,22 +51,23 @@ impl<T: Domain> ExpressionTree<T> {
             ExpressionTree::Value(_) => state,
             ExpressionTree::Variable(var, val) => state.put(var, val.glb(&refined_value)),
             ExpressionTree::Binop { value, op, l, r } => {
+                let c = value.glb(&refined_value);
                 let a = l.value();
                 let b = r.value();
-                let c = value.glb(&refined_value);
+                let s = T::round(&c);
 
-                // c is more precise, therefore a,b are more precise too
-                let (better_a, better_b) = match op {
+                let (new_a, new_b) = match op {
                     ArithmeticExpr::Add(_, _) => (c - b, c - a),
                     ArithmeticExpr::Sub(_, _) => (c + b, a - c),
                     ArithmeticExpr::Mul(_, _) => (c / b, c / a),
-                    ArithmeticExpr::Div(_, _) => (c * b, a / c),
+                    ArithmeticExpr::Div(_, _) => (s * b, (a / s).lub(&T::ZERO)),
                     _ => unreachable!(),
                 };
 
-                let ltree_state = l.refine(better_a, state);
-                let rtree_state = r.refine(better_b, ltree_state);
-                rtree_state
+                let (new_a, new_b) = (a.glb(&new_a), b.glb(&new_b));
+                let l_state = l.refine(new_a, state);
+                let r_state = r.refine(new_b, l_state);
+                r_state
             }
         }
     }

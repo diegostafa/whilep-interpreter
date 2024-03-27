@@ -4,9 +4,10 @@ use crate::domain::lattice::*;
 use crate::parser::ast::*;
 use crate::types::integer::*;
 use crate::utils::math::*;
+use std::ops::Add;
 use std::{
     cmp, fmt,
-    ops::{self, Neg},
+    ops::{self},
     str::FromStr,
 };
 
@@ -105,8 +106,8 @@ impl Domain for Interval {
                 let a2_tree = ExpressionTree::build(a2, state).0;
                 let (i1, i2) = (a1_tree.value(), a2_tree.value());
 
-                let l_intersection = i1.glb(&(i2.open_min() - ONE));
-                let r_intersection = i2.glb(&(i1.open_max() + ONE));
+                let l_intersection = i1.glb(&(i2.open_min() - ONE)); // [neginf, b-1]
+                let r_intersection = i2.glb(&(i1.open_max() + ONE)); // [a+1, posinf]
 
                 match (l_intersection, r_intersection) {
                     (Interval::Empty, _) | (_, Interval::Empty) => State::Bottom,
@@ -129,6 +130,7 @@ impl Lattice for Interval {
     const TOP: Self = Interval::Range(Integer::NegInf, Integer::PosInf);
     const BOT: Self = Interval::Empty;
     const UNIT: Self = Interval::Range(ONE, ONE);
+    const ZERO: Self = Interval::Range(ZERO, ZERO);
 
     fn lub(&self, other: &Self) -> Self {
         match (*self, *other) {
@@ -155,17 +157,17 @@ impl Lattice for Interval {
     }
 
     fn widen(&self, other: &Self) -> Self {
-        let lb = max!(Integer::NegInf, unsafe { LOWER_BOUND });
-        let ub = min!(Integer::PosInf, unsafe { UPPER_BOUND });
-
-        match (*self, *other) {
-            (a, Interval::Empty) => a,
-            (Interval::Empty, b) => b,
-            (Interval::Range(a, b), Interval::Range(c, d)) => {
-                let min = if a <= c { a } else { lb };
-                let max = if b >= d { b } else { ub };
-                Interval::Range(min, max)
-            }
+        match unsafe { (LOWER_BOUND, UPPER_BOUND) } {
+            (Integer::Value(_), Integer::Value(_)) => other.clone(),
+            _ => match (*self, *other) {
+                (a, Interval::Empty) => a,
+                (Interval::Empty, b) => b,
+                (Interval::Range(a, b), Interval::Range(c, d)) => {
+                    let min = if a <= c { a } else { Integer::NegInf };
+                    let max = if b >= d { b } else { Integer::PosInf };
+                    Interval::Range(min, max)
+                }
+            },
         }
     }
 
@@ -179,6 +181,10 @@ impl Lattice for Interval {
             }
         }
         .check_bounds()
+    }
+
+    fn round(x: &Self) -> Self {
+        x.add(Interval::Range(-ONE, ONE))
     }
 }
 
@@ -231,18 +237,6 @@ impl fmt::Display for Interval {
     }
 }
 
-impl ops::Neg for Interval {
-    type Output = Self;
-
-    fn neg(self) -> Self {
-        match self {
-            Interval::Empty => self,
-            Interval::Range(a, b) => Interval::Range(-b, -a),
-        }
-        .check_bounds()
-    }
-}
-
 impl ops::Add<Interval> for Interval {
     type Output = Self;
 
@@ -290,20 +284,17 @@ impl ops::Div<Interval> for Interval {
 
     fn div(self, other: Self) -> Self {
         match (self, other) {
-            (Interval::Range(a, b), Interval::Range(c, d)) => {
-                let one = ONE;
-
-                match (c, d) {
-                    _ if c >= one => Interval::Range(min!(a / c, a / d), max!(b / c, b / d)),
-                    _ if d <= -one => Interval::Range(min!(b / c, b / d), max!(a / c, a / d)),
-                    _ => {
-                        let semibound = Interval::Range(one, Integer::PosInf);
-                        let pos = self / other.glb(&semibound);
-                        let neg = self / other.glb(&semibound.neg());
-                        pos.lub(&neg)
-                    }
+            (Interval::Range(a, b), Interval::Range(c, d)) => match (c, d) {
+                _ if c >= ONE => Interval::Range(min!(a / c, a / d), max!(b / c, b / d)),
+                _ if d <= -ONE => Interval::Range(min!(b / c, b / d), max!(a / c, a / d)),
+                _ => {
+                    let l_semibound = Interval::Range(Integer::NegInf, -ONE);
+                    let r_semibound = Interval::Range(ONE, Integer::PosInf);
+                    let pos = self / other.glb(&l_semibound);
+                    let neg = self / other.glb(&r_semibound);
+                    pos.lub(&neg)
                 }
-            }
+            },
             _ => Interval::Empty,
         }
         .check_bounds()

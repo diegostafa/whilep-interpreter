@@ -6,7 +6,9 @@ use crate::types::integer::*;
 
 type IntResult = Result<(Integer, State), ArithmeticExprError>;
 type BoolResult = Result<(bool, State), ArithmeticExprError>;
-type StateFunction = Box<dyn Fn(State) -> Option<State>>;
+type StateResult = Result<Option<State>, ArithmeticExprError>;
+
+type StateFunction = Box<dyn Fn(State) -> StateResult>;
 type Functional = Box<dyn Fn(StateFunction) -> StateFunction>;
 
 trait FunctionMethods {
@@ -104,24 +106,25 @@ pub fn eval_bexpr(expr: &BooleanExpr, state: &State) -> BoolResult {
 // --- semantic functions
 
 fn bottom() -> StateFunction {
-    Box::new(|_| None)
+    Box::new(|_| Ok(None))
 }
 
 fn id() -> StateFunction {
-    Box::new(|state| Some(state))
+    Box::new(|state| Ok(Some(state)))
 }
 
 fn compose(f: StateFunction, g: StateFunction) -> StateFunction {
     Box::new(move |state| match f(state.clone()) {
-        Some(new_state) => g(new_state),
-        None => None,
+        Ok(Some(new_state)) => g(new_state),
+        Ok(None) => Ok(None),
+        Err(e) => Err(e),
     })
 }
 
 fn state_update(var: Identifier, val: ArithmeticExpr) -> StateFunction {
     Box::new(move |state| match eval_aexpr(&val, &state) {
-        Ok((val, new_state)) => Some(new_state.put(&var, val)),
-        Err(_) => None,
+        Ok((val, new_state)) => Ok(Some(new_state.put(&var, val))),
+        Err(e) => Err(e),
     })
 }
 
@@ -129,7 +132,7 @@ fn conditional(cond: BooleanExpr, s1: StateFunction, s2: StateFunction) -> State
     Box::new(move |state| match eval_bexpr(&cond, &state) {
         Ok((true, new_state)) => s1(new_state),
         Ok((false, new_state)) => s2(new_state),
-        _ => None,
+        Err(e) => Err(e),
     })
 }
 
@@ -138,22 +141,10 @@ fn fix(f: Functional) -> StateFunction {
         let mut g = bottom();
         loop {
             g = f(g);
-            if let Some(state) = g(state.clone()) {
-                return Some(state);
-            }
-        }
-    })
-}
-
-// alternative implementation
-fn _fix(f: Functional) -> StateFunction {
-    Box::new(move |state| {
-        let mut n = 0;
-        loop {
-            n += 1;
-            let g = f.compose_many(n, bottom());
-            if let Some(state) = g(state.clone()) {
-                return Some(state);
+            match g(state.clone()) {
+                Ok(Some(state)) => return Ok(Some(state)),
+                Ok(None) => continue,
+                Err(e) => return Err(e),
             }
         }
     })

@@ -6,7 +6,6 @@ An interpreter for the concrete and abstract semantics of the While+ programming
 
 categories:
 * *n* : Integer
-* *range* : Interval
 * *x* : Variable
 * *a* : Arithmetic expression
 * *b* : Boolean expression
@@ -18,10 +17,10 @@ S ::= skip
     | if b then S else S end
     | while b do S done
     | repeat S until b
-    | for x in range do S done
+    | for x in [a, a] do S done
 
 a ::= n
-    | range
+    | [a, a]
     | x
     | (a op a)
     | x++ | x--
@@ -55,39 +54,4 @@ Options:
 
 ```sh
 cargo run -- -s example/test.wp --check-interval --check-constant --eval
-```
-
-output:
-```
-[INFO] evaluating the abstract semantics in the Interval domain
-+---+--------------------------+-------------------+
-| # | Program point            | Invariant         |
-+---+--------------------------+-------------------+
-| 0 | x := 10                  | x: [10]           |
-| 1 | y := 7                   | x: [10], y: [7]   |
-| 2 | [while-guard] (x-- >= 0) | x: [-1,9], y: [7] |
-| 3 | y := (y + 1)             | x: [-1,9], y: [8] |
-| 4 | y := (y - 1)             | x: [-1,9], y: [7] |
-| 5 | [end-while] (x-- < 0)    | x: [-2], y: [7]   |
-+---+--------------------------+-------------------+
-
-[INFO] evaluating the abstract semantics in the Constant domain
-+---+--------------------------+--------------+
-| # | Program point            | Invariant    |
-+---+--------------------------+--------------+
-| 0 | x := 10                  | x: 10        |
-| 1 | y := 7                   | x: 10, y: 7  |
-| 2 | [while-guard] (x-- >= 0) | x: Any, y: 7 |
-| 3 | y := (y + 1)             | x: Any, y: 8 |
-| 4 | y := (y - 1)             | x: Any, y: 7 |
-| 5 | [end-while] (x-- < 0)    | x: Any, y: 7 |
-+---+--------------------------+--------------+
-
-[INFO] evaluating the concrete semantics
-+---+-----+-----+
-| # | Var | Val |
-+---+-----+-----+
-| 0 | y   | 7   |
-| 1 | x   | -2  |
-+---+-----+-----+
 ```

@@ -42,20 +42,15 @@ pub trait Domain: DomainProperties + Lattice + Arithmetic {
             BooleanExpr::False => State::Bottom,
             BooleanExpr::Not(b) => Self::eval_bexpr(&b.negate(), state),
             BooleanExpr::And(b1, b2) => {
-                let lhs1 = Self::eval_bexpr(b1, state);
-                let lhs2 = Self::eval_bexpr(b2, &lhs1);
-                let rhs2 = Self::eval_bexpr(b2, state);
-                let rhs1 = Self::eval_bexpr(b1, &rhs2);
-                lhs2.glb(&rhs1)
+                let lhs = Self::eval_bexpr(b1, state);
+                let rhs = Self::eval_bexpr(b2, &lhs);
+                lhs.glb(&rhs)
             }
             BooleanExpr::Or(b1, b2) => {
-                let lhs1 = Self::eval_bexpr(b1, state);
-                let lhs2 = Self::eval_bexpr(b2, &lhs1);
-                let rhs2 = Self::eval_bexpr(b2, state);
-                let rhs1 = Self::eval_bexpr(b1, &rhs2);
-                lhs2.lub(&rhs1)
+                let lhs = Self::eval_bexpr(b1, state);
+                let rhs = Self::eval_bexpr(b2, &lhs);
+                lhs.lub(&rhs)
             }
-
             BooleanExpr::NumLtEq(a1, a2) => {
                 let lt = Self::eval_bexpr(&BooleanExpr::NumLt(a1.clone(), a2.clone()), state);
                 let eq = Self::eval_bexpr(&BooleanExpr::NumEq(a1.clone(), a2.clone()), state);
